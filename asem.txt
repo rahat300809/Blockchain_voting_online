@@ -1,0 +1,8 @@
+======================================
+          VOTER CREDENTIALS           
+======================================
+Secret Key:   SEC_447748356
+Fingerprint:  1234
+Public Addr:  PUB_38477915
+--------------------------------------
+IMPORTANT: Do not share this file!

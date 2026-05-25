@@ -1,0 +1,24 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "Build All Blockchain Components",
+            "type": "shell",
+            "command": "C:\\msys64\\mingw64\\bin\\g++.exe",
+            "args": [
+                "-c",
+                "C:\\msys64\\mingw64\\bin\\g++.exe core.cpp -o core.exe -I\"C:/msys64/mingw64/include\" -L\"C:/msys64/mingw64/lib\" -static -static-libgcc -static-libstdc++ -lssl -lcrypto -lws2_32 -lgdi32 -lcrypt32 && C:\\msys64\\mingw64\\bin\\g++.exe admin.cpp -o admin.exe -I\"C:/msys64/mingw64/include\" -L\"C:/msys64/mingw64/lib\" -static -static-libgcc -static-libstdc++ -lssl -lcrypto -lws2_32 -lgdi32 -lcrypt32 && C:\\msys64\\mingw64\\bin\\g++.exe agent.cpp -o agent.exe -I\"C:/msys64/mingw64/include\" -L\"C:/msys64/mingw64/lib\" -static -static-libgcc -static-libstdc++ -lssl -lcrypto -lws2_32 -lgdi32 -lcrypt32 && C:\\msys64\\mingw64\\bin\\g++.exe voter.cpp -o voter.exe -I\"C:/msys64/mingw64/include\" -L\"C:/msys64/mingw64/lib\" -static -static-libgcc -static-libstdc++ -lssl -lcrypto -lws2_32 -lgdi32 -lcrypt32"
+            ],
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            },
+            "presentation": {
+                "reveal": "always"
+            },
+            "problemMatcher": [
+                "$gcc"
+            ]
+        }
+    ]
+}
