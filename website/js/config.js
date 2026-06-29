@@ -25,7 +25,7 @@
  */
 
 // Set your server URL here (null = auto-detect from hostname)
-window.BLOCKVOTE_SERVER_URL = "https://smooth-worms-jump.loca.lt";
+window.BLOCKVOTE_SERVER_URL = "https://41dbeebf4b1e7a.lhr.life";
 
 // Examples:
 // window.BLOCKVOTE_SERVER_URL = "https://abc123.ngrok-free.app";   // ngrok
