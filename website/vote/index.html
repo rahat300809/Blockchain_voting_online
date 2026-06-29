@@ -1,0 +1,489 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Cast Your Vote — BlockVote</title>
+  <meta name="description" content="Cast your anonymous blockchain vote securely. Login with your secret key and OTP from the polling agent.">
+  <link rel="stylesheet" href="/css/design-system.css">
+  <style>
+    .main-content { padding: 32px 0; max-width: 640px; margin: 0 auto; }
+
+    /* Multi-step flow */
+    .vote-step { display: none; }
+    .vote-step.active { display: block; animation: fadeIn 0.35s var(--ease-out); }
+
+    /* Vote success */
+    .vote-success {
+      text-align: center; padding: 48px 32px;
+    }
+    .vote-success-icon { font-size: 5rem; display: block; margin-bottom: 20px; animation: otp-appear 0.6s var(--ease-out); }
+    .vote-success-title { font-size: 1.8rem; font-weight: 900; margin-bottom: 8px; color: var(--c-success); }
+    .vote-success-sub   { font-size: 0.95rem; color: var(--c-text-muted); margin-bottom: 32px; line-height: 1.7; }
+
+    .receipt-box {
+      background: rgba(16,185,129,0.06); border: 1px solid rgba(16,185,129,0.2);
+      border-radius: var(--r-xl); padding: 24px; margin-bottom: 24px;
+      text-align: left;
+    }
+    .receipt-row { display: flex; justify-content: space-between; align-items: center;
+      padding: 8px 0; border-bottom: 1px solid rgba(255,255,255,0.05); font-size: 0.85rem; }
+    .receipt-row:last-child { border-bottom: none; }
+    .receipt-label { color: var(--c-text-muted); }
+    .receipt-value { font-family: var(--font-mono); color: var(--c-text); font-size: 0.8rem; }
+
+    /* OTP input group */
+    .otp-input-group {
+      display: flex; gap: 8px; justify-content: center; margin: 24px 0;
+    }
+    .otp-input {
+      width: 52px; height: 64px;
+      background: var(--c-surface-2); border: 2px solid var(--c-border);
+      border-radius: var(--r-md); text-align: center;
+      font-family: var(--font-mono); font-size: 1.6rem; font-weight: 700;
+      color: var(--c-text); transition: border-color var(--t-fast), box-shadow var(--t-fast);
+      -webkit-tap-highlight-color: transparent;
+    }
+    .otp-input:focus { outline: none; border-color: var(--c-success); box-shadow: 0 0 0 3px rgba(16,185,129,0.2); }
+    .otp-input.filled { border-color: rgba(16,185,129,0.4); }
+    @media (max-width: 400px) { .otp-input { width: 42px; height: 54px; font-size: 1.3rem; } }
+
+    /* Candidate selected confirm */
+    .selected-candidate-confirm {
+      display: flex; align-items: center; gap: 16px;
+      padding: 20px; border-radius: var(--r-lg);
+      background: rgba(16,185,129,0.08); border: 1px solid rgba(16,185,129,0.25);
+      margin-bottom: 16px;
+    }
+    .sel-cand-avatar { font-size: 2.5rem; }
+    .sel-cand-name   { font-size: 1.1rem; font-weight: 700; }
+    .sel-cand-note   { font-size: 0.8rem; color: var(--c-text-muted); }
+  </style>
+</head>
+<body>
+  <div class="bg-grid" aria-hidden="true"></div>
+  <div class="bg-glow bg-glow-1" aria-hidden="true"
+    style="background:radial-gradient(circle,#10b981,transparent 70%);top:-100px;right:-100px"></div>
+
+  <div class="page-wrapper">
+    <nav class="navbar" role="navigation">
+      <div class="container navbar-inner">
+        <a href="/" class="navbar-brand">
+          <div class="logo-icon" aria-hidden="true">🔗</div>
+          <div class="brand-text">Block<span>Vote</span></div>
+        </a>
+        <div class="navbar-status">
+          <div class="status-dot" id="statusDot"></div>
+          <span class="status-text" id="statusText">Connecting...</span>
+        </div>
+      </div>
+    </nav>
+
+    <div class="container">
+      <div class="main-content">
+
+        <div class="page-header">
+          <div class="page-title">🗳️ Cast Your Vote</div>
+          <div class="page-desc">Secure, anonymous, blockchain-recorded vote</div>
+        </div>
+
+        <!-- Step Indicator -->
+        <div class="steps mb-xl" aria-label="Voting progress" id="stepIndicator">
+          <div class="step active" id="vstep1"><div class="step-num">1</div><div class="step-label">Login</div></div>
+          <div class="step" id="vstep2"><div class="step-num">2</div><div class="step-label">Enter OTP</div></div>
+          <div class="step" id="vstep3"><div class="step-num">3</div><div class="step-label">Select Candidate</div></div>
+          <div class="step" id="vstep4"><div class="step-num">4</div><div class="step-label">Confirm Vote</div></div>
+        </div>
+
+        <!-- Voting Day Status Banner -->
+        <div id="votingDayBanner" class="alert alert-warn mb-lg hidden" role="alert">
+          <span class="alert-icon">🔒</span>
+          <div><strong>Voting Day is currently CLOSED.</strong> The Election Commission has not yet opened voting. Please wait.</div>
+        </div>
+
+        <!-- STEP 1: Login -->
+        <div class="vote-step active" id="vstep-1">
+          <div class="card role-voter">
+            <div class="card-header">
+              <div class="card-icon role-voter" aria-hidden="true">🔐</div>
+              <div>
+                <div class="card-title">Voter Login</div>
+                <div class="card-subtitle">Enter your secret key and fingerprint</div>
+              </div>
+            </div>
+            <form id="loginForm" novalidate>
+              <div class="form-grid" style="gap:20px">
+                <div class="form-group">
+                  <label class="form-label" for="secretKey">Secret Key</label>
+                  <input class="form-input mono" type="text" id="secretKey"
+                    placeholder="SEC_abc123..." required aria-required="true"
+                    autocomplete="off" spellcheck="false">
+                  <div class="form-helper">The key you received during registration</div>
+                </div>
+                <div class="form-group">
+                  <label class="form-label" for="loginFp">Fingerprint Code</label>
+                  <input class="form-input mono" type="text" id="loginFp"
+                    placeholder="e.g. 1234" required aria-required="true"
+                    autocomplete="off" maxlength="10">
+                </div>
+              </div>
+              <div id="loginAlert" class="mt-md" aria-live="polite"></div>
+              <button type="submit" class="btn btn-full btn-lg mt-xl" id="loginBtn"
+                style="background:linear-gradient(135deg,var(--c-voter),#059669);color:#fff;box-shadow:0 4px 16px rgba(16,185,129,0.3)">
+                <span class="btn-text">🔐 Login &amp; Continue</span>
+              </button>
+            </form>
+            <div class="mt-lg text-center">
+              <span class="text-muted" style="font-size:0.82rem">Not registered yet? </span>
+              <a href="/register" class="text-primary" style="font-size:0.82rem;font-weight:600">Register First →</a>
+            </div>
+          </div>
+        </div>
+
+        <!-- STEP 2: OTP Verification -->
+        <div class="vote-step" id="vstep-2">
+          <div class="card role-voter">
+            <div class="card-header">
+              <div class="card-icon role-voter" aria-hidden="true">🔑</div>
+              <div>
+                <div class="card-title">Enter OTP</div>
+                <div class="card-subtitle">6-digit code from your Polling Agent</div>
+              </div>
+            </div>
+            <div class="alert alert-info mb-lg">
+              <span class="alert-icon" aria-hidden="true">ℹ️</span>
+              <div>Visit the <strong>Polling Agent terminal</strong> with your voter number and fingerprint to get your 6-digit OTP first.</div>
+            </div>
+            <div class="otp-input-group" id="otpInputGroup" aria-label="OTP entry">
+              <input class="otp-input" type="text" inputmode="numeric" pattern="[0-9]" maxlength="1" aria-label="OTP digit 1" id="otp0">
+              <input class="otp-input" type="text" inputmode="numeric" pattern="[0-9]" maxlength="1" aria-label="OTP digit 2" id="otp1">
+              <input class="otp-input" type="text" inputmode="numeric" pattern="[0-9]" maxlength="1" aria-label="OTP digit 3" id="otp2">
+              <input class="otp-input" type="text" inputmode="numeric" pattern="[0-9]" maxlength="1" aria-label="OTP digit 4" id="otp3">
+              <input class="otp-input" type="text" inputmode="numeric" pattern="[0-9]" maxlength="1" aria-label="OTP digit 5" id="otp4">
+              <input class="otp-input" type="text" inputmode="numeric" pattern="[0-9]" maxlength="1" aria-label="OTP digit 6" id="otp5">
+            </div>
+            <div id="otpAlert" class="mt-md" aria-live="polite"></div>
+            <button class="btn btn-full btn-lg" id="verifyOtpBtn"
+              style="background:linear-gradient(135deg,var(--c-voter),#059669);color:#fff">
+              <span class="btn-text">✅ Verify OTP</span>
+            </button>
+            <div class="mt-md text-center">
+              <button class="btn btn-ghost btn-sm" onclick="goToStep(1)">← Back to Login</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- STEP 3: Select Candidate -->
+        <div class="vote-step" id="vstep-3">
+          <div class="card role-voter">
+            <div class="card-header">
+              <div class="card-icon role-voter" aria-hidden="true">🗳️</div>
+              <div>
+                <div class="card-title">Select Your Candidate</div>
+                <div class="card-subtitle">Choose one candidate — your vote is anonymous and final</div>
+              </div>
+            </div>
+            <div id="candidatesGrid" class="candidate-grid" aria-label="Candidates" role="radiogroup"></div>
+            <div id="candidatesAlert" class="mt-md" aria-live="polite"></div>
+            <button class="btn btn-full btn-lg mt-xl" id="proceedVoteBtn" disabled
+              style="background:linear-gradient(135deg,var(--c-voter),#059669);color:#fff">
+              <span class="btn-text">Continue to Confirm →</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- STEP 4: Confirm -->
+        <div class="vote-step" id="vstep-4">
+          <div class="card role-voter">
+            <div class="card-header">
+              <div class="card-icon role-voter" aria-hidden="true">⚠️</div>
+              <div>
+                <div class="card-title">Confirm Your Vote</div>
+                <div class="card-subtitle">This action is irreversible — you can only vote once</div>
+              </div>
+            </div>
+            <div class="selected-candidate-confirm" id="confirmCandidate" aria-label="Selected candidate confirmation">
+              <div class="sel-cand-avatar" aria-hidden="true">🗳️</div>
+              <div>
+                <div class="sel-cand-name" id="confirmCandName">—</div>
+                <div class="sel-cand-note">Your vote will be recorded anonymously on the blockchain</div>
+              </div>
+            </div>
+            <div class="alert alert-warn mb-lg">
+              <span class="alert-icon" aria-hidden="true">⚠️</span>
+              <div>Once submitted, <strong>your vote cannot be changed</strong>. The blockchain is permanent and tamper-proof.</div>
+            </div>
+            <div id="castAlert" class="mt-md" aria-live="polite"></div>
+            <div class="d-flex gap-md">
+              <button class="btn btn-ghost" onclick="goToStep(3)">← Change Candidate</button>
+              <button class="btn btn-success btn-full btn-lg" id="castVoteBtn">
+                <span class="btn-text">🗳️ Cast Vote Now</span>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- SUCCESS -->
+        <div class="vote-step" id="vstep-done">
+          <div class="card role-voter vote-success">
+            <span class="vote-success-icon" aria-hidden="true">✅</span>
+            <div class="vote-success-title">Vote Cast!</div>
+            <div class="vote-success-sub">
+              Your anonymous vote has been permanently recorded on the blockchain.<br>
+              Thank you for participating in the democratic process.
+            </div>
+            <div class="receipt-box" aria-label="Vote receipt">
+              <div class="receipt-row"><span class="receipt-label">Status</span><span class="receipt-value text-success">CONFIRMED</span></div>
+              <div class="receipt-row"><span class="receipt-label">Vote Type</span><span class="receipt-value">USER_VOTE (verifiable)</span></div>
+              <div class="receipt-row"><span class="receipt-label">Encryption</span><span class="receipt-value">AES-256-CBC</span></div>
+              <div class="receipt-row"><span class="receipt-label">Time</span><span class="receipt-value" id="receiptTime">—</span></div>
+              <div class="receipt-row"><span class="receipt-label">Candidate</span><span class="receipt-value" id="receiptCandidate">—</span></div>
+            </div>
+
+            <!-- Live results preview -->
+            <div class="section-title text-left">Live Results</div>
+            <div id="liveResults" class="results-container text-left" aria-live="polite"></div>
+
+            <!-- Verify my vote button -->
+            <div class="mt-xl">
+              <button class="btn btn-ghost" id="verifyMyVoteBtn">
+                🔍 Verify My Vote on Blockchain
+              </button>
+              <div id="verifyVoteResult" class="mt-md" aria-live="polite"></div>
+            </div>
+
+            <a href="/" class="btn btn-ghost mt-lg">← Return to Home</a>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <script src="/js/config.js"></script>
+  <script src="/js/websocket-client.js"></script>
+  <script>
+    const { ws, api, ui } = window.VotingSystem;
+    ws.connect('voter');
+
+    // ─── State ───
+    let currentStep = 1;
+    let sessionKey = '';
+    let sessionFp  = '';
+    let enteredOtp = '';
+    let selectedCandIdx = null;
+    let selectedCandName = '';
+    let candidates = [];
+
+    // ─── Step Navigation ───
+    function goToStep(n) {
+      document.querySelectorAll('.vote-step').forEach(s => s.classList.remove('active'));
+      const targetId = n === 'done' ? 'vstep-done' : `vstep-${n}`;
+      const target = document.getElementById(targetId);
+      if (target) target.classList.add('active');
+      currentStep = n;
+
+      // Update step indicator
+      for (let i = 1; i <= 4; i++) {
+        const el = document.getElementById(`vstep${i}`);
+        if (!el) continue;
+        el.classList.remove('active', 'done');
+        if (i < n) el.classList.add('done');
+        else if (i === n) el.classList.add('active');
+      }
+      if (n === 'done') {
+        for (let i = 1; i <= 4; i++) {
+          const el = document.getElementById(`vstep${i}`);
+          if (el) el.classList.add('done');
+        }
+        document.getElementById('stepIndicator').classList.add('hidden');
+      }
+    }
+
+    // ─── STEP 1: Login ───
+    document.getElementById('loginForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const btn = document.getElementById('loginBtn');
+      ui.setButtonLoading(btn, true);
+      ui.clearAlert('loginAlert');
+      sessionKey = document.getElementById('secretKey').value.trim();
+      sessionFp  = document.getElementById('loginFp').value.trim();
+      if (!sessionKey || !sessionFp) {
+        ui.showAlert('loginAlert', 'Please enter both secret key and fingerprint', 'error');
+        ui.setButtonLoading(btn, false);
+        return;
+      }
+      try {
+        const r = await api.post('/api/voter/login', { secretKey: sessionKey, fingerprint: sessionFp });
+        if (r.ok) {
+          goToStep(2);
+          document.getElementById('otp0').focus();
+        } else {
+          ui.showAlert('loginAlert', r.errors?.join(' ') || 'Invalid credentials. Check your secret key and fingerprint.', 'error');
+        }
+      } catch (err) {
+        ui.showAlert('loginAlert', 'Server error: ' + err.message, 'error');
+      }
+      ui.setButtonLoading(btn, false);
+    });
+
+    // ─── OTP Input — smart digit navigation ───
+    const otpInputs = document.querySelectorAll('.otp-input');
+    otpInputs.forEach((input, i) => {
+      input.addEventListener('input', (e) => {
+        const val = e.target.value.replace(/[^0-9]/g, '');
+        e.target.value = val.slice(-1);
+        if (val && i < 5) otpInputs[i + 1].focus();
+        updateOtpFilled();
+      });
+      input.addEventListener('keydown', (e) => {
+        if (e.key === 'Backspace' && !input.value && i > 0) {
+          otpInputs[i - 1].focus();
+          otpInputs[i - 1].value = '';
+        }
+        if (e.key === 'ArrowLeft' && i > 0) otpInputs[i - 1].focus();
+        if (e.key === 'ArrowRight' && i < 5) otpInputs[i + 1].focus();
+      });
+      // Handle paste
+      input.addEventListener('paste', (e) => {
+        e.preventDefault();
+        const paste = (e.clipboardData || window.clipboardData).getData('text').replace(/[^0-9]/g, '');
+        paste.split('').slice(0, 6).forEach((ch, j) => {
+          if (otpInputs[j]) { otpInputs[j].value = ch; otpInputs[j].classList.add('filled'); }
+        });
+        if (otpInputs[Math.min(paste.length, 5)]) otpInputs[Math.min(paste.length, 5)].focus();
+        updateOtpFilled();
+      });
+    });
+
+    function updateOtpFilled() {
+      otpInputs.forEach(inp => inp.classList.toggle('filled', inp.value.length > 0));
+    }
+
+    function getOtpValue() {
+      return Array.from(otpInputs).map(i => i.value).join('');
+    }
+
+    document.getElementById('verifyOtpBtn').addEventListener('click', async () => {
+      enteredOtp = getOtpValue();
+      if (enteredOtp.length !== 6) {
+        ui.showAlert('otpAlert', 'Please enter all 6 digits', 'error');
+        return;
+      }
+      ui.clearAlert('otpAlert');
+      // Load candidates while OTP is accepted
+      await loadCandidates();
+      goToStep(3);
+    });
+
+    // ─── STEP 3: Candidates ───
+    async function loadCandidates() {
+      try {
+        const r = await api.get('/api/voter/candidates');
+        candidates = r.candidates || [];
+        ui.renderCandidateCards('candidatesGrid', candidates, (idx, name) => {
+          selectedCandIdx = parseInt(idx);
+          selectedCandName = name;
+          document.getElementById('proceedVoteBtn').disabled = false;
+        });
+        if (candidates.length === 0) {
+          ui.showAlert('candidatesAlert', 'No candidates added yet. Ask the Election Commission.', 'warn');
+        }
+      } catch (err) {
+        ui.showAlert('candidatesAlert', 'Failed to load candidates: ' + err.message, 'error');
+      }
+    }
+
+    document.getElementById('proceedVoteBtn').addEventListener('click', () => {
+      if (!selectedCandIdx) { ui.showAlert('candidatesAlert', 'Please select a candidate', 'error'); return; }
+      document.getElementById('confirmCandName').textContent = selectedCandName;
+      goToStep(4);
+    });
+
+    // ─── STEP 4: Cast Vote ───
+    document.getElementById('castVoteBtn').addEventListener('click', async () => {
+      const btn = document.getElementById('castVoteBtn');
+      ui.setButtonLoading(btn, true);
+      ui.clearAlert('castAlert');
+      try {
+        const r = await api.post('/api/voter/cast-vote', {
+          secretKey: sessionKey,
+          fingerprint: sessionFp,
+          otp: enteredOtp,
+          candidateIndex: selectedCandIdx,
+        });
+        if (r.ok) {
+          // Show success
+          document.getElementById('receiptTime').textContent = new Date().toLocaleString();
+          document.getElementById('receiptCandidate').textContent = '✓ Anonymized (VOTE_SALT hash)';
+          goToStep('done');
+          // Load live results
+          const res = await api.get('/api/admin/results');
+          if (res.ok) ui.renderVoteBars('liveResults', res.results || {});
+          ui.toast('🗳️ Your vote is on the blockchain!', 'success');
+        } else {
+          ui.showAlert('castAlert', r.errors?.join(' ') || 'Vote could not be cast. OTP may have expired.', 'error');
+        }
+      } catch (err) {
+        ui.showAlert('castAlert', 'Server error: ' + err.message, 'error');
+      }
+      ui.setButtonLoading(btn, false);
+    });
+
+    // ─── WebSocket ───
+    ws.on('vote_cast', (data) => {
+      if (data.results) ui.renderVoteBars('liveResults', data.results);
+    });
+    ws.on('candidate_added', () => {
+      if (currentStep === 3) loadCandidates();
+    });
+    ws.on('voting_day_toggled', (data) => {
+      const banner = document.getElementById('votingDayBanner');
+      if (data.votingDayOn) {
+        banner.classList.add('hidden');
+      } else {
+        banner.classList.remove('hidden');
+        ui.toast('🔒 Voting Day has been closed by Election Commission', 'warn');
+      }
+    });
+
+    // Verify my vote button
+    document.getElementById('verifyMyVoteBtn').addEventListener('click', async () => {
+      const btn = document.getElementById('verifyMyVoteBtn');
+      ui.setButtonLoading(btn, true);
+      try {
+        const r = await api.post('/api/voter/verify-vote', { secretKey: sessionKey, fingerprint: sessionFp });
+        const el = document.getElementById('verifyVoteResult');
+        if (r.ok && r.found) {
+          el.innerHTML = `
+            <div class="card-sm" style="background:rgba(16,185,129,0.08);border:1px solid rgba(16,185,129,0.3);border-radius:var(--r-md);padding:16px;text-align:left">
+              <div style="color:var(--c-success);font-weight:700;margin-bottom:8px">✅ Vote Verified on Blockchain!</div>
+              <div style="font-size:0.8rem;font-family:var(--font-mono);line-height:2;color:var(--c-text-dim)">
+                Block Index: ${r.blockIndex}<br>
+                Candidate: ${r.candidate}<br>
+                Block Hash: <span style="color:var(--c-accent);word-break:break-all">${r.blockHash}</span><br>
+                Public Address: <span style="color:var(--c-accent-2);word-break:break-all">${r.publicAddress}</span>
+              </div>
+            </div>
+          `;
+        } else if (r.ok && !r.found) {
+          el.innerHTML = '<div class="alert alert-warn"><span class="alert-icon">⚠️</span><div>Vote not yet found in chain. Ensure the chain is synced.</div></div>';
+        } else {
+          el.innerHTML = `<div class="alert alert-error"><span class="alert-icon">❌</span><div>${r.errors?.join(' ') || 'Verification failed'}</div></div>`;
+        }
+      } catch (err) {
+        document.getElementById('verifyVoteResult').innerHTML = `<div class="alert alert-error"><span class="alert-icon">❌</span><div>${err.message}</div></div>`;
+      }
+      ui.setButtonLoading(btn, false);
+    });
+
+    // Check voting day status on load
+    api.get('/api/state').then(r => {
+      if (r.ok && !r.state.votingDayOn) {
+        document.getElementById('votingDayBanner').classList.remove('hidden');
+      }
+    }).catch(() => {});
+  </script>
+</body>
+</html>
+

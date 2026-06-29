@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Polling Agent — BlockVote</title>
+  <meta name="description" content="Polling Agent Terminal — Verify voter fingerprints and issue one-time OTPs for secure voting.">
+  <link rel="stylesheet" href="/css/design-system.css">
+  <style>
+    .main-content { padding: 32px 0; max-width: 600px; margin: 0 auto; }
+
+    .otp-issued-box {
+      background: rgba(6,182,212,0.08); border: 2px solid rgba(6,182,212,0.3);
+      border-radius: var(--r-xl); padding: 32px; text-align: center;
+      animation: scaleIn 0.4s var(--ease-out);
+    }
+    .otp-title { font-size: 1.1rem; font-weight: 700; color: var(--c-agent); margin-bottom: 24px; }
+    .otp-countdown-wrap {
+      display: flex; align-items: center; justify-content: center; gap: 8px;
+      margin-top: 16px; font-size: 0.85rem; color: var(--c-text-muted);
+    }
+    .otp-countdown-label { }
+    #otpCountdown { font-family: var(--font-mono); font-weight: 700; font-size: 1rem; }
+
+    .otp-instruction {
+      margin-top: 16px; padding: 12px 16px;
+      background: rgba(0,0,0,0.3); border-radius: var(--r-md);
+      font-size: 0.82rem; color: var(--c-text-muted); line-height: 1.6;
+    }
+
+    .history-log { max-height: 250px; overflow-y: auto; }
+    .log-entry {
+      display: flex; align-items: center; gap: 12px;
+      padding: 10px 12px; border-radius: var(--r-sm);
+      background: var(--c-surface-3); border: 1px solid var(--c-border);
+      margin-bottom: 8px; font-size: 0.8rem;
+    }
+    .log-entry-time { color: var(--c-text-muted); font-family: var(--font-mono); flex-shrink: 0; }
+    .log-entry-msg  { flex: 1; }
+
+    .agent-status-row {
+      display: flex; align-items: center; gap: 16px;
+      padding: 12px 16px; background: var(--c-surface-2);
+      border: 1px solid var(--c-border); border-radius: var(--r-md);
+      margin-bottom: 24px; font-size: 0.85rem;
+    }
+  </style>
+</head>
+<body>
+  <div class="bg-grid" aria-hidden="true"></div>
+  <div class="bg-glow bg-glow-2" aria-hidden="true" style="background:radial-gradient(circle,#06b6d4,transparent 70%)"></div>
+
+  <!-- Login Screen -->
+  <div id="loginScreen" class="page-wrapper">
+    <nav class="navbar" role="navigation">
+      <div class="container navbar-inner">
+        <a href="/" class="navbar-brand">
+          <div class="logo-icon" aria-hidden="true">🔗</div>
+          <div class="brand-text">Block<span>Vote</span></div>
+        </a>
+        <div class="navbar-status">
+          <div class="status-dot" id="statusDot"></div>
+          <span class="status-text" id="statusText">Connecting...</span>
+        </div>
+      </div>
+    </nav>
+
+    <div class="login-screen">
+      <div class="login-box">
+        <div class="card role-agent fade-in">
+          <div class="card-header">
+            <div class="card-icon role-agent" aria-hidden="true">🧑‍💼</div>
+            <div>
+              <div class="card-title">Polling Agent</div>
+              <div class="card-subtitle">Agent credentials required</div>
+            </div>
+          </div>
+          <form id="loginForm" novalidate>
+            <div class="form-grid" style="gap:16px">
+              <div class="form-group">
+                <label class="form-label" for="agentId">Agent ID</label>
+                <input class="form-input" type="text" id="agentId" placeholder="agent"
+                  autocomplete="username" required aria-required="true">
+              </div>
+              <div class="form-group">
+                <label class="form-label" for="agentPass">Password</label>
+                <input class="form-input" type="password" id="agentPass" placeholder="Password"
+                  autocomplete="current-password" required aria-required="true">
+              </div>
+            </div>
+            <div id="loginAlert" class="mt-md" aria-live="polite"></div>
+            <button type="submit" class="btn btn-full btn-lg mt-lg" id="loginBtn"
+              style="background:linear-gradient(135deg,var(--c-agent),#0891b2);color:#fff;box-shadow:0 4px 16px rgba(6,182,212,0.3)">
+              <span class="btn-text">🔐 Agent Login</span>
+            </button>
+          </form>
+          <div class="mt-md text-center">
+            <a href="/" class="btn btn-ghost btn-sm">← Back to Home</a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Dashboard -->
+  <div id="dashboardScreen" class="hidden">
+    <nav class="navbar" role="navigation">
+      <div class="container navbar-inner">
+        <a href="/" class="navbar-brand">
+          <div class="logo-icon" aria-hidden="true">🔗</div>
+          <div class="brand-text">Block<span>Vote</span></div>
+        </a>
+        <div class="d-flex align-center gap-md">
+          <div class="navbar-status">
+            <div class="status-dot online"></div>
+            <span>Live</span>
+          </div>
+          <div class="badge" style="background:rgba(6,182,212,0.15);color:var(--c-agent);border:1px solid rgba(6,182,212,0.3)">
+            🧑‍💼 Polling Agent
+          </div>
+          <button class="btn btn-ghost btn-sm" onclick="location.href='/'">Logout</button>
+        </div>
+      </div>
+    </nav>
+
+    <div class="container">
+      <div class="main-content">
+
+        <div class="page-header">
+          <div class="page-title">Issue Voter OTP</div>
+          <div class="page-desc">Verify voter identity and issue a one-time 6-digit code for secure voting</div>
+        </div>
+
+        <!-- Status row -->
+        <div class="agent-status-row" aria-label="Agent session info">
+          <span>🧑‍💼 Agent session active</span>
+          <div class="badge badge-success">Active</div>
+          <span class="text-muted">OTPs valid for 5 minutes</span>
+        </div>
+
+        <!-- Issue OTP Form -->
+        <div class="card role-agent" id="otpFormCard">
+          <div class="card-header">
+            <div class="card-icon role-agent" aria-hidden="true">🔑</div>
+            <div>
+              <div class="card-title">Issue OTP</div>
+              <div class="card-subtitle">Enter voter number and verify fingerprint</div>
+            </div>
+          </div>
+          <form id="otpForm" novalidate>
+            <div class="form-grid" style="gap:16px">
+              <div class="form-group">
+                <label class="form-label" for="voterNumber">Voter Number</label>
+                <input class="form-input mono" type="text" id="voterNumber"
+                  placeholder="e.g. BD001" required aria-required="true"
+                  autocomplete="off">
+              </div>
+              <div class="form-group">
+                <label class="form-label" for="fingerprint">Fingerprint Code</label>
+                <input class="form-input mono" type="text" id="fingerprint"
+                  placeholder="e.g. 1234" required aria-required="true"
+                  autocomplete="off" maxlength="10">
+                <div class="form-helper">Enter the voter's registered fingerprint code</div>
+              </div>
+            </div>
+            <div id="otpAlert" class="mt-md" aria-live="polite"></div>
+            <button type="submit" class="btn btn-full btn-lg mt-lg" id="issueOtpBtn"
+              style="background:linear-gradient(135deg,var(--c-agent),#0891b2);color:#fff">
+              <span class="btn-text">🔑 Verify &amp; Issue OTP</span>
+            </button>
+          </form>
+        </div>
+
+        <!-- OTP Display (shown after success) -->
+        <div id="otpResult" class="hidden mt-lg">
+          <div class="otp-issued-box">
+            <div class="otp-title">✅ OTP Issued Successfully!</div>
+            <p class="text-muted mb-lg" style="font-size:0.875rem">Show this code to the voter. They must enter it in the Vote Casting terminal.</p>
+            <div class="otp-display" id="otpDigits" aria-label="One-time password"></div>
+            <div class="otp-countdown-wrap">
+              <span class="otp-countdown-label">⏱️ Expires in:</span>
+              <span id="otpCountdown" aria-live="polite" aria-label="OTP expiry countdown">5:00</span>
+            </div>
+            <div class="otp-instruction">
+              📋 Instructions for the voter:<br>
+              1. Go to the <strong>Vote Casting</strong> terminal<br>
+              2. Log in with your Secret Key + Fingerprint<br>
+              3. Enter this OTP when prompted<br>
+              4. Select your candidate and submit
+            </div>
+            <button class="btn btn-ghost btn-sm mt-lg" id="issueAnotherBtn">Issue Another OTP</button>
+          </div>
+        </div>
+
+        <!-- Recent Activity -->
+        <div class="card-sm" style="background:var(--glass-bg);border:1px solid var(--c-border);border-radius:var(--r-md);margin-top:24px;padding:var(--sp-lg)">
+          <div class="section-title">Recent Activity</div>
+          <div id="activityLog" class="history-log" aria-label="OTP issuance history" aria-live="polite">
+            <div class="text-muted" style="font-size:0.8rem;padding:8px 0">No OTPs issued this session.</div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <script src="/js/config.js"></script>
+  <script src="/js/websocket-client.js"></script>
+  <script>
+    const { ws, api, ui } = window.VotingSystem;
+    ws.connect('agent');
+
+    let stopCountdown = null;
+    let activityLog = [];
+
+    // ─── Login ───
+    document.getElementById('loginForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const btn = document.getElementById('loginBtn');
+      ui.setButtonLoading(btn, true);
+      ui.clearAlert('loginAlert');
+      const id = document.getElementById('agentId').value.trim();
+      const pass = document.getElementById('agentPass').value;
+      try {
+        const r = await api.post('/api/agent/login', { id, password: pass });
+        if (r.ok) {
+          document.getElementById('loginScreen').classList.add('hidden');
+          document.getElementById('dashboardScreen').classList.remove('hidden');
+        } else {
+          ui.showAlert('loginAlert', r.errors?.join(' ') || 'Invalid agent credentials', 'error');
+        }
+      } catch (err) {
+        ui.showAlert('loginAlert', 'Cannot connect to server.', 'error');
+      }
+      ui.setButtonLoading(btn, false);
+    });
+
+    // ─── Issue OTP ───
+    document.getElementById('otpForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const btn = document.getElementById('issueOtpBtn');
+      ui.setButtonLoading(btn, true);
+      ui.clearAlert('otpAlert');
+      const voterNumber = document.getElementById('voterNumber').value.trim();
+      const fingerprint = document.getElementById('fingerprint').value.trim();
+      if (!voterNumber || !fingerprint) {
+        ui.showAlert('otpAlert', 'Please enter both voter number and fingerprint', 'error');
+        ui.setButtonLoading(btn, false);
+        return;
+      }
+      try {
+        const r = await api.post('/api/agent/issue-otp', { voterNumber, fingerprint });
+        if (r.ok && r.otp) {
+          showOtpResult(r.otp, voterNumber);
+          addActivityEntry(voterNumber, 'OTP issued');
+          ui.toast('✅ OTP issued successfully', 'success');
+        } else {
+          const msg = r.errors?.join(' ') || r.messages?.join(' ') || 'OTP could not be issued';
+          ui.showAlert('otpAlert', msg, 'error');
+          addActivityEntry(voterNumber, 'DENIED — ' + msg);
+        }
+      } catch (err) {
+        ui.showAlert('otpAlert', 'Server error: ' + err.message, 'error');
+      }
+      ui.setButtonLoading(btn, false);
+    });
+
+    function showOtpResult(otp, voterNumber) {
+      document.getElementById('otpFormCard').classList.add('hidden');
+      const resultEl = document.getElementById('otpResult');
+      resultEl.classList.remove('hidden');
+      ui.displayOtp('otpDigits', otp);
+
+      // Start 5-minute countdown
+      if (stopCountdown) stopCountdown();
+      stopCountdown = ui.startCountdown('otpCountdown', 300, () => {
+        ui.toast('⏱️ OTP has expired', 'warn');
+      });
+    }
+
+    document.getElementById('issueAnotherBtn').addEventListener('click', () => {
+      document.getElementById('otpResult').classList.add('hidden');
+      document.getElementById('otpFormCard').classList.remove('hidden');
+      document.getElementById('voterNumber').value = '';
+      document.getElementById('fingerprint').value = '';
+      document.getElementById('voterNumber').focus();
+      if (stopCountdown) { stopCountdown(); stopCountdown = null; }
+    });
+
+    function addActivityEntry(voterNum, msg) {
+      const time = new Date().toLocaleTimeString();
+      activityLog.unshift({ time, voterNum, msg });
+      const el = document.getElementById('activityLog');
+      el.innerHTML = activityLog.slice(0, 20).map(e => `
+        <div class="log-entry">
+          <span class="log-entry-time">${e.time}</span>
+          <span class="log-entry-msg">${e.msg}</span>
+        </div>
+      `).join('');
+    }
+
+    // ─── WebSocket Events ───
+    ws.on('voter_registered', () => {
+      ui.toast('📋 New voter registered in system', 'info');
+    });
+  </script>
+</body>
+</html>
+

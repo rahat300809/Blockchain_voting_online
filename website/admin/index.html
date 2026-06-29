@@ -1,0 +1,761 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Election Commission — BlockVote</title>
+  <meta name="description" content="Election Commission Admin Panel — Manage voter rolls, candidates, view live results and verify blockchain integrity.">
+  <link rel="stylesheet" href="/css/design-system.css">
+  <style>
+    .dashboard { display: grid; grid-template-columns: 280px 1fr; gap: 24px; min-height: calc(100dvh - 80px); padding: 24px 0; }
+    @media (max-width: 900px) { .dashboard { grid-template-columns: 1fr; } }
+    .sidebar { display: flex; flex-direction: column; gap: 8px; }
+    .sidebar-btn {
+      display: flex; align-items: center; gap: 12px;
+      padding: 14px 16px; border-radius: var(--r-md);
+      border: 1px solid transparent; background: transparent;
+      color: var(--c-text-muted); font-family: var(--font-sans);
+      font-size: 0.9rem; font-weight: 500;
+      cursor: pointer; transition: all var(--t-fast); text-align: left;
+      width: 100%;
+    }
+    .sidebar-btn:hover { background: var(--c-surface-2); color: var(--c-text); }
+    .sidebar-btn.active { background: rgba(245,158,11,0.1); border-color: rgba(245,158,11,0.3); color: var(--c-admin); }
+    .sidebar-btn .s-icon { font-size: 18px; width: 24px; text-align: center; flex-shrink: 0; }
+    .sidebar-divider { height: 1px; background: var(--c-border); margin: 8px 0; }
+    .sidebar-danger .sidebar-btn:hover { background: rgba(239,68,68,0.08); color: var(--c-danger); }
+
+    .panel { display: none; }
+    .panel.active { display: block; animation: fadeIn 0.3s var(--ease-out); }
+
+    .results-container { display: flex; flex-direction: column; gap: 16px; margin-top: 16px; }
+
+    .integrity-log {
+      font-family: var(--font-mono); font-size: 0.75rem;
+      background: rgba(0,0,0,0.5); border: 1px solid var(--c-border);
+      border-radius: var(--r-md); padding: 16px;
+      max-height: 300px; overflow-y: auto; line-height: 1.8;
+    }
+    .log-ok     { color: #86efac; }
+    .log-tamper { color: #fca5a5; }
+    .log-info   { color: #93c5fd; }
+    .log-warn   { color: #fcd34d; }
+
+    .voter-file-preview {
+      background: var(--c-surface-3); border: 1px solid var(--c-border);
+      border-radius: var(--r-sm); padding: 12px 16px;
+      font-family: var(--font-mono); font-size: 0.75rem;
+      color: var(--c-text-dim); max-height: 150px; overflow-y: auto;
+    }
+
+    .reset-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    @media (max-width: 600px) { .reset-grid { grid-template-columns: 1fr; } }
+    .reset-item {
+      border: 1px solid rgba(239,68,68,0.2); border-radius: var(--r-md); padding: 20px;
+      background: rgba(239,68,68,0.05);
+    }
+    .reset-item-title { font-weight: 700; font-size: 0.9rem; color: var(--c-danger); margin-bottom: 4px; }
+    .reset-item-desc  { font-size: 0.78rem; color: var(--c-text-muted); margin-bottom: 12px; }
+
+    .stats-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; margin-bottom: 24px; }
+    .chain-badge {
+      display: inline-flex; align-items: center; gap: 8px;
+      padding: 8px 16px; border-radius: var(--r-md); font-weight: 700; font-size: 0.85rem;
+    }
+    .chain-badge.intact    { background: rgba(16,185,129,0.15); color: var(--c-success); border: 1px solid rgba(16,185,129,0.3); }
+    .chain-badge.tampered  { background: rgba(239,68,68,0.15);  color: var(--c-danger);  border: 1px solid rgba(239,68,68,0.3);  }
+    .chain-badge.unchecked { background: rgba(100,116,139,0.15); color: var(--c-text-muted); border: 1px solid var(--c-border); }
+
+    .modal-overlay {
+      position: fixed; inset: 0; z-index: 200;
+      background: rgba(0,0,0,0.7); backdrop-filter: blur(4px);
+      display: flex; align-items: center; justify-content: center; padding: 24px;
+      animation: fadeIn 0.2s;
+    }
+    .modal { width: 100%; max-width: 440px; }
+    .modal-title { font-size: 1.1rem; font-weight: 800; margin-bottom: 8px; }
+    .modal-desc  { font-size: 0.875rem; color: var(--c-text-muted); margin-bottom: 24px; }
+    .modal-actions { display: flex; gap: 12px; justify-content: flex-end; }
+  </style>
+</head>
+<body>
+  <div class="bg-grid" aria-hidden="true"></div>
+  <div class="bg-glow bg-glow-1" aria-hidden="true"></div>
+
+  <!-- Login Screen -->
+  <div id="loginScreen" class="page-wrapper">
+    <nav class="navbar" role="navigation">
+      <div class="container navbar-inner">
+        <a href="/" class="navbar-brand">
+          <div class="logo-icon" aria-hidden="true">🔗</div>
+          <div class="brand-text">Block<span>Vote</span></div>
+        </a>
+        <div class="navbar-status">
+          <div class="status-dot" id="statusDot"></div>
+          <span class="status-text" id="statusText">Connecting...</span>
+        </div>
+      </div>
+    </nav>
+
+    <div class="login-screen">
+      <div class="login-box">
+        <div class="card role-admin fade-in">
+          <div class="card-header">
+            <div class="card-icon role-admin" aria-hidden="true">🏛️</div>
+            <div>
+              <div class="card-title">Election Commission</div>
+              <div class="card-subtitle">Secure admin access required</div>
+            </div>
+          </div>
+          <form id="loginForm" novalidate>
+            <div class="form-grid" style="gap:16px">
+              <div class="form-group">
+                <label class="form-label" for="adminId">Admin ID</label>
+                <input class="form-input" type="text" id="adminId" name="adminId"
+                  placeholder="Enter admin ID" autocomplete="username" required
+                  aria-required="true">
+              </div>
+              <div class="form-group">
+                <label class="form-label" for="adminPass">Password</label>
+                <input class="form-input" type="password" id="adminPass" name="adminPass"
+                  placeholder="Enter password" autocomplete="current-password" required
+                  aria-required="true">
+              </div>
+            </div>
+            <div id="loginAlert" class="mt-md" aria-live="polite"></div>
+            <button type="submit" class="btn btn-primary btn-full btn-lg mt-lg" id="loginBtn">
+              <span class="btn-text">🔐 Secure Login</span>
+            </button>
+          </form>
+          <div class="mt-md text-center">
+            <a href="/" class="btn btn-ghost btn-sm">← Back to Home</a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Dashboard (hidden until login) -->
+  <div id="dashboardScreen" class="hidden">
+    <nav class="navbar" role="navigation">
+      <div class="container navbar-inner">
+        <a href="/" class="navbar-brand">
+          <div class="logo-icon" aria-hidden="true">🔗</div>
+          <div class="brand-text">Block<span>Vote</span></div>
+        </a>
+        <div class="d-flex align-center gap-md">
+          <div class="navbar-status">
+            <div class="status-dot online" id="dashStatusDot"></div>
+            <span>Live</span>
+          </div>
+          <div class="badge badge-warn">🏛️ Election Commission</div>
+          <button class="btn btn-ghost btn-sm" id="logoutBtn">Logout</button>
+        </div>
+      </div>
+    </nav>
+
+    <div class="container">
+      <div class="dashboard">
+
+        <!-- Sidebar navigation -->
+        <aside class="sidebar" aria-label="Admin navigation">
+          <div class="page-header" style="padding:16px 0 12px; margin:0 0 8px">
+            <div class="page-title" style="font-size:1rem">Admin Dashboard</div>
+          </div>
+          <button class="sidebar-btn active" id="nav-voters" onclick="showPanel('voters')" aria-current="page">
+            <span class="s-icon" aria-hidden="true">📂</span> Load Voter File
+          </button>
+          <button class="sidebar-btn" id="nav-candidates" onclick="showPanel('candidates')">
+            <span class="s-icon" aria-hidden="true">👤</span> Add Candidate
+          </button>
+          <button class="sidebar-btn" id="nav-results" onclick="showPanel('results')">
+            <span class="s-icon" aria-hidden="true">📊</span> Live Results
+          </button>
+          <button class="sidebar-btn" id="nav-verify" onclick="showPanel('verify')">
+            <span class="s-icon" aria-hidden="true">🔍</span> Verify Blockchain
+          </button>
+          <button class="sidebar-btn" id="nav-votingday" onclick="showPanel('votingday')">
+            <span class="s-icon" aria-hidden="true">🗓️</span> Voting Day
+          </button>
+          <button class="sidebar-btn" id="nav-audit" onclick="showPanel('audit')">
+            <span class="s-icon" aria-hidden="true">📜</span> Audit Ledger
+          </button>
+          <div class="sidebar-divider"></div>
+          <div class="sidebar-danger">
+            <button class="sidebar-btn" id="nav-reset" onclick="showPanel('reset')">
+              <span class="s-icon" aria-hidden="true">⚠️</span> Danger Zone
+            </button>
+          </div>
+        </aside>
+
+        <!-- Main Content Area -->
+        <div>
+
+          <!-- Panel: Load Voter File -->
+          <div class="panel active" id="panel-voters">
+            <div class="card role-admin">
+              <div class="card-header">
+                <div class="card-icon role-admin" aria-hidden="true">📂</div>
+                <div>
+                  <div class="card-title">Load Voter File</div>
+                  <div class="card-subtitle">Authorize voters from the official voter roll file</div>
+                </div>
+              </div>
+              <div class="alert alert-info mb-md">
+                <span class="alert-icon" aria-hidden="true">ℹ️</span>
+                <div>Voter file format: <code class="text-mono">VoterID Fingerprint</code> (one per line, space-separated). 
+                Example: <code class="text-mono">BD001 1234</code></div>
+              </div>
+              <form id="voterFileForm" novalidate>
+                <div class="form-group">
+                  <label class="form-label" for="voterFilePath">Voter File Path (on server machine)</label>
+                  <input class="form-input mono" type="text" id="voterFilePath"
+                    placeholder="e.g. C:\data\voters.txt  or  data.txt"
+                    autocomplete="off">
+                  <div class="form-helper">Enter the full path to the voter text file on the server computer</div>
+                </div>
+                <div id="voterFileAlert" class="mt-md" aria-live="polite"></div>
+                <button type="submit" class="btn btn-primary mt-lg" id="loadVoterBtn">
+                  <span class="btn-text">📂 Load Voter File</span>
+                </button>
+              </form>
+
+              <div style="margin: 24px 0; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 24px;"></div>
+              
+              <form id="voterPasteForm" novalidate>
+                <div class="form-group">
+                  <label class="form-label" for="voterPasteArea">OR Paste Voter Roll Content</label>
+                  <textarea class="form-input mono" id="voterPasteArea" rows="10"
+                    placeholder="BD001 1234&#10;BD002 5678&#10;BD003 9012"
+                    style="font-family: var(--font-mono); resize: vertical; min-height: 150px; background: rgba(0,0,0,0.2)"></textarea>
+                  <div class="form-helper">Paste one voter ID and fingerprint per line, separated by space.</div>
+                </div>
+                <div id="voterPasteAlert" class="mt-md" aria-live="polite"></div>
+                <button type="submit" class="btn btn-primary mt-lg" id="saveVoterPasteBtn"
+                  style="background: linear-gradient(135deg, var(--c-accent), var(--c-accent-2)); color: #fff">
+                  <span class="btn-text">💾 Save & Load Pasted Voter Data</span>
+                </button>
+              </form>
+              
+              <div id="voterFilePreview" class="voter-file-preview mt-lg hidden" aria-label="File preview"></div>
+            </div>
+          </div>
+
+          <!-- Panel: Add Candidate -->
+          <div class="panel" id="panel-candidates">
+            <div class="card role-admin">
+              <div class="card-header">
+                <div class="card-icon role-admin" aria-hidden="true">👤</div>
+                <div>
+                  <div class="card-title">Add Candidates</div>
+                  <div class="card-subtitle">Add eligible candidates to the election blockchain</div>
+                </div>
+              </div>
+              <form id="candidateForm" novalidate>
+                <div class="form-group">
+                  <label class="form-label" for="candidateName">Candidate Full Name</label>
+                  <input class="form-input" type="text" id="candidateName"
+                    placeholder="e.g. John Ahmed" required aria-required="true">
+                </div>
+                <div id="candidateAlert" class="mt-md" aria-live="polite"></div>
+                <button type="submit" class="btn btn-primary mt-md" id="addCandidateBtn">
+                  <span class="btn-text">➕ Add Candidate</span>
+                </button>
+              </form>
+              <div class="section-title mt-xl">Current Candidates</div>
+              <div id="candidateList" class="candidate-grid" aria-label="Candidate list" aria-live="polite">
+                <div class="text-muted" style="font-size:0.875rem">No candidates added yet.</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Panel: Live Results -->
+          <div class="panel" id="panel-results">
+            <div class="card role-admin">
+              <div class="card-header">
+                <div class="card-icon role-admin" aria-hidden="true">📊</div>
+                <div>
+                  <div class="card-title">Live Election Results</div>
+                  <div class="card-subtitle">Real-time vote tally from the blockchain</div>
+                </div>
+              </div>
+              <div class="stats-row" aria-label="Election statistics">
+                <div class="stat-card">
+                  <div class="stat-value text-primary" id="resTotalVotes">0</div>
+                  <div class="stat-label">Total Votes</div>
+                </div>
+                <div class="stat-card">
+                  <div class="stat-value" id="resLeader" style="font-size:1.1rem">—</div>
+                  <div class="stat-label">Current Leader</div>
+                </div>
+                <div class="stat-card">
+                  <div class="stat-value text-success" id="resLeaderPct">—</div>
+                  <div class="stat-label">Leader %</div>
+                </div>
+              </div>
+              <div id="resultsContainer" class="results-container" aria-live="polite" aria-label="Vote results"></div>
+              <div class="d-flex gap-md mt-lg">
+                <button class="btn btn-primary" id="refreshResultsBtn">
+                  <span class="btn-text">🔄 Refresh Results</span>
+                </button>
+                <div class="badge badge-info" id="lastUpdateBadge">Not loaded</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Panel: Verify Blockchain -->
+          <div class="panel" id="panel-verify">
+            <div class="card role-admin">
+              <div class="card-header">
+                <div class="card-icon role-admin" aria-hidden="true">🔍</div>
+                <div>
+                  <div class="card-title">Blockchain Integrity Verification</div>
+                  <div class="card-subtitle">Full cryptographic audit of every block in the chain</div>
+                </div>
+              </div>
+              <div id="chainBadge" class="chain-badge unchecked mb-lg" role="status">
+                🔘 Not yet verified
+              </div>
+              <p class="text-muted mb-lg" style="font-size:0.875rem">
+                This verification reads every block from <code class="text-mono">election_data.enc</code>, 
+                decrypts it with AES-256, and checks: sequential block index, previous hash chain link, 
+                and block header integrity. Any tampering — even one byte — is detected.
+              </p>
+              <button class="btn btn-primary" id="verifyChainBtn">
+                <span class="btn-text">🛡️ Run Full Verification</span>
+              </button>
+              <div id="integrityLog" class="integrity-log mt-lg hidden" aria-label="Verification log" aria-live="polite"></div>
+            </div>
+          </div>
+
+          <!-- Panel: Voting Day Toggle -->
+          <div class="panel" id="panel-votingday">
+            <div class="card role-admin">
+              <div class="card-header">
+                <div class="card-icon role-admin" aria-hidden="true">🗓️</div>
+                <div>
+                  <div class="card-title">Voting Day Control</div>
+                  <div class="card-subtitle">Open or close the voting window for all voters</div>
+                </div>
+              </div>
+              <div id="votingDayStatus" class="text-center" style="margin:24px 0">
+                <div style="font-size:3rem;margin-bottom:12px" id="votingDayIcon">🔒</div>
+                <div style="font-size:1.4rem;font-weight:800" id="votingDayLabel">Voting Day: CLOSED</div>
+                <div class="text-muted mt-sm" style="font-size:0.85rem">Voters cannot cast votes until Voting Day is turned ON</div>
+              </div>
+              <div class="alert alert-warn mb-lg">
+                <span class="alert-icon">⚠️</span>
+                <div>Toggling Voting Day is recorded as an immutable block on the blockchain.</div>
+              </div>
+              <div id="votingDayAlert" aria-live="polite"></div>
+              <button class="btn btn-full btn-lg" id="toggleVotingDayBtn"
+                style="background:linear-gradient(135deg,#10b981,#059669);color:#fff;margin-top:16px">
+                <span class="btn-text" id="toggleVotingDayBtnText">🗓️ Open Voting Day (Turn ON)</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Panel: Audit Ledger -->
+          <div class="panel" id="panel-audit">
+            <div class="card role-admin">
+              <div class="card-header">
+                <div class="card-icon role-admin" aria-hidden="true">📜</div>
+                <div>
+                  <div class="card-title">Full Blockchain Audit Ledger</div>
+                  <div class="card-subtitle">Human-readable audit of every block — voters, OTPs, votes, configs</div>
+                </div>
+              </div>
+              <p class="text-muted mb-lg" style="font-size:0.875rem">
+                This reads and decrypts every block from <code class="text-mono">election_data.enc</code>, printing its type, hashes, and decoded content. Useful for election transparency and auditing.
+              </p>
+              <button class="btn btn-primary" id="auditLedgerBtn">
+                <span class="btn-text">📜 Load Full Audit</span>
+              </button>
+              <button class="btn btn-ghost btn-sm mt-sm" id="downloadAuditBtn" style="display:none">⬇️ Download Audit Report</button>
+              <div id="auditLog" class="integrity-log mt-lg hidden" aria-label="Audit ledger" aria-live="polite"></div>
+            </div>
+          </div>
+
+          <!-- Panel: Danger Zone -->
+          <div class="panel" id="panel-reset">
+            <div class="card" style="border-color:rgba(239,68,68,0.3)">
+              <div class="card-header">
+                <div class="card-icon" style="background:rgba(239,68,68,0.15);color:var(--c-danger)" aria-hidden="true">⚠️</div>
+                <div>
+                  <div class="card-title text-danger">Danger Zone</div>
+                  <div class="card-subtitle">Irreversible operations — use with extreme caution</div>
+                </div>
+              </div>
+              <div class="alert alert-error mb-xl">
+                <span class="alert-icon" aria-hidden="true">🔴</span>
+                <div><strong>These actions cannot be undone.</strong> All operations are logged to the audit trail.</div>
+              </div>
+              <div class="reset-grid">
+                <div class="reset-item">
+                  <div class="reset-item-title">Reset Votes Only</div>
+                  <div class="reset-item-desc">Clears all cast votes and OTPs. Candidates and voter registrations remain.</div>
+                  <button class="btn btn-danger btn-sm" id="resetVotesBtn">Reset Votes</button>
+                </div>
+                <div class="reset-item">
+                  <div class="reset-item-title">Factory Reset</div>
+                  <div class="reset-item-desc">Wipes EVERYTHING — all blocks, votes, candidates, voter accounts. Complete fresh start.</div>
+                  <button class="btn btn-danger btn-sm" id="factoryResetBtn">Factory Reset</button>
+                </div>
+              </div>
+              <div id="resetAlert" class="mt-lg" aria-live="polite"></div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Confirm Modal -->
+  <div id="confirmModal" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+    <div class="card modal">
+      <div class="modal-title" id="modalTitle">Confirm Action</div>
+      <div class="modal-desc" id="modalDesc">Are you sure?</div>
+      <div id="modalExtra"></div>
+      <div class="modal-actions">
+        <button class="btn btn-ghost" id="modalCancel">Cancel</button>
+        <button class="btn btn-danger" id="modalConfirm">Confirm</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="/js/config.js"></script>
+  <script src="/js/websocket-client.js"></script>
+  <script>
+    const { ws, api, ui } = window.VotingSystem;
+    ws.connect('admin');
+
+    // ─── Panel Navigation ───
+    function showPanel(name) {
+      document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+      document.querySelectorAll('.sidebar-btn').forEach(b => b.classList.remove('active'));
+      document.getElementById(`panel-${name}`).classList.add('active');
+      document.getElementById(`nav-${name}`).classList.add('active');
+      document.getElementById(`nav-${name}`).setAttribute('aria-current', 'page');
+    }
+
+    // ─── State ───
+    let candidates = [];
+    let isLoggedIn = false;
+
+    // ─── Login ───
+    const loginForm = document.getElementById('loginForm');
+    loginForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const btn = document.getElementById('loginBtn');
+      ui.setButtonLoading(btn, true);
+      ui.clearAlert('loginAlert');
+      const id = document.getElementById('adminId').value.trim();
+      const pass = document.getElementById('adminPass').value;
+      try {
+        const r = await api.post('/api/admin/login', { id, password: pass });
+        if (r.ok) {
+          document.getElementById('loginScreen').classList.add('hidden');
+          document.getElementById('dashboardScreen').classList.remove('hidden');
+          isLoggedIn = true;
+          loadResults();
+        } else {
+          ui.showAlert('loginAlert', r.errors?.join(' ') || 'Invalid credentials', 'error');
+        }
+      } catch (err) {
+        ui.showAlert('loginAlert', 'Cannot connect to server. Is the backend running?', 'error');
+      }
+      ui.setButtonLoading(btn, false);
+    });
+
+    document.getElementById('logoutBtn').addEventListener('click', () => {
+      location.href = '/';
+    });
+
+    // ─── Load Voter File ───
+    document.getElementById('voterFileForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const btn = document.getElementById('loadVoterBtn');
+      ui.setButtonLoading(btn, true);
+      ui.clearAlert('voterFileAlert');
+      const filePath = document.getElementById('voterFilePath').value.trim();
+      try {
+        const r = await api.post('/api/admin/load-voter-file', { filePath });
+        if (r.ok) {
+          ui.showAlert('voterFileAlert', r.messages?.join(' ') || 'Voter file loaded successfully!', 'success');
+          ui.toast('📂 Voter file loaded!', 'success');
+        } else {
+          ui.showAlert('voterFileAlert', r.errors?.join(' ') || 'Failed to load voter file', 'error');
+        }
+      } catch (err) {
+        ui.showAlert('voterFileAlert', 'Server error: ' + err.message, 'error');
+      }
+      ui.setButtonLoading(btn, false);
+    });
+
+    // ─── Paste Voter Roll Content ───
+    document.getElementById('voterPasteForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const btn = document.getElementById('saveVoterPasteBtn');
+      ui.setButtonLoading(btn, true);
+      ui.clearAlert('voterPasteAlert');
+      const voterData = document.getElementById('voterPasteArea').value;
+      if (!voterData.trim()) {
+        ui.showAlert('voterPasteAlert', 'Please paste some voter data first.', 'error');
+        ui.setButtonLoading(btn, false);
+        return;
+      }
+      try {
+        const r = await api.post('/api/admin/save-voter-data', { voterData });
+        if (r.ok) {
+          ui.showAlert('voterPasteAlert', r.messages?.join(' ') || 'Voter data saved and loaded into blockchain successfully!', 'success');
+          ui.toast('💾 Voter data saved & loaded!', 'success');
+          document.getElementById('voterPasteArea').value = '';
+        } else {
+          ui.showAlert('voterPasteAlert', r.errors?.join(' ') || 'Failed to save and load voter data', 'error');
+        }
+      } catch (err) {
+        ui.showAlert('voterPasteAlert', 'Server error: ' + err.message, 'error');
+      }
+      ui.setButtonLoading(btn, false);
+    });
+
+    // ─── Add Candidate ───
+    document.getElementById('candidateForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const btn = document.getElementById('addCandidateBtn');
+      ui.setButtonLoading(btn, true);
+      ui.clearAlert('candidateAlert');
+      const name = document.getElementById('candidateName').value.trim();
+      if (!name) { ui.showAlert('candidateAlert', 'Please enter a candidate name', 'error'); ui.setButtonLoading(btn, false); return; }
+      try {
+        const r = await api.post('/api/admin/add-candidate', { name });
+        if (r.ok) {
+          if (!candidates.includes(name)) { candidates.push(name); renderCandidateList(); }
+          document.getElementById('candidateName').value = '';
+          ui.showAlert('candidateAlert', `Candidate "${name}" added to blockchain!`, 'success');
+          ui.toast(`👤 ${name} added as candidate`, 'success');
+        } else {
+          ui.showAlert('candidateAlert', r.errors?.join(' ') || 'Failed to add candidate', 'error');
+        }
+      } catch (err) {
+        ui.showAlert('candidateAlert', 'Server error: ' + err.message, 'error');
+      }
+      ui.setButtonLoading(btn, false);
+    });
+
+    function renderCandidateList() {
+      const el = document.getElementById('candidateList');
+      if (candidates.length === 0) {
+        el.innerHTML = '<div class="text-muted" style="font-size:0.875rem">No candidates added yet.</div>';
+        return;
+      }
+      const emojis = ['🗳️','⭐','🔵','🟢','🔴','🏛️','🌟','💡','🎯','🚀'];
+      el.innerHTML = candidates.map((name, i) => `
+        <div class="candidate-card" style="cursor:default">
+          <div class="candidate-avatar">${emojis[i % emojis.length]}</div>
+          <div class="candidate-name">${name}</div>
+          <div class="candidate-index">Candidate ${i + 1}</div>
+        </div>
+      `).join('');
+    }
+
+    // ─── Live Results ───
+    async function loadResults() {
+      const btn = document.getElementById('refreshResultsBtn');
+      ui.setButtonLoading(btn, true);
+      try {
+        const r = await api.get('/api/admin/results');
+        if (r.ok) {
+          ui.renderVoteBars('resultsContainer', r.results || {});
+          const total = Object.values(r.results || {}).reduce((a, b) => a + b, 0);
+          document.getElementById('resTotalVotes').textContent = total;
+          document.getElementById('resLeader').textContent = r.leader || '—';
+          const pct = total > 0 ? Math.round((r.leaderVotes / total) * 100) : 0;
+          document.getElementById('resLeaderPct').textContent = total > 0 ? `${pct}%` : '—';
+          document.getElementById('lastUpdateBadge').textContent = 'Updated ' + new Date().toLocaleTimeString();
+          // sync candidate list
+          candidates = Object.keys(r.results || {});
+          renderCandidateList();
+        }
+      } catch (err) {
+        ui.toast('Failed to load results', 'error');
+      }
+      ui.setButtonLoading(btn, false);
+    }
+
+    document.getElementById('refreshResultsBtn').addEventListener('click', loadResults);
+
+    // ─── Verify Chain ───
+    document.getElementById('verifyChainBtn').addEventListener('click', async () => {
+      const btn = document.getElementById('verifyChainBtn');
+      ui.setButtonLoading(btn, true);
+      const log = document.getElementById('integrityLog');
+      log.innerHTML = '<span class="log-info">>>> Running verification...</span>';
+      log.classList.remove('hidden');
+      try {
+        const r = await api.get('/api/admin/verify-chain');
+        const badge = document.getElementById('chainBadge');
+        if (r.intact) {
+          badge.className = 'chain-badge intact';
+          badge.textContent = '✅ Blockchain INTACT — No Tampering Detected';
+          ui.toast('✅ Blockchain integrity verified!', 'success');
+        } else {
+          badge.className = 'chain-badge tampered';
+          badge.textContent = '🚨 TAMPERED — Chain Compromised!';
+          ui.toast('🚨 Blockchain tampered!', 'error');
+        }
+        log.innerHTML = (r.lines || []).map(l => {
+          if (l.includes('[OK]') || l.includes('CLEAN'))    return `<div class="log-ok">${l}</div>`;
+          if (l.includes('[TAMPER]') || l.includes('COMPROMISED')) return `<div class="log-tamper">${l}</div>`;
+          if (l.includes('[WARNING]')) return `<div class="log-warn">${l}</div>`;
+          return `<div class="log-info">${l}</div>`;
+        }).join('');
+      } catch (err) {
+        log.innerHTML = '<span class="log-tamper">Error: ' + err.message + '</span>';
+      }
+      ui.setButtonLoading(btn, false);
+    });
+
+    // ─── Confirm Modal Helper ───
+    function showConfirm(title, desc, onConfirm, extraHTML = '') {
+      document.getElementById('modalTitle').textContent = title;
+      document.getElementById('modalDesc').textContent = desc;
+      document.getElementById('modalExtra').innerHTML = extraHTML;
+      document.getElementById('confirmModal').classList.remove('hidden');
+      document.getElementById('modalConfirm').onclick = async () => {
+        document.getElementById('confirmModal').classList.add('hidden');
+        await onConfirm();
+      };
+      document.getElementById('modalCancel').onclick = () => {
+        document.getElementById('confirmModal').classList.add('hidden');
+      };
+    }
+
+    // ─── Danger Zone ───
+    document.getElementById('resetVotesBtn').addEventListener('click', () => {
+      showConfirm('Reset All Votes', 'This will permanently delete all votes and OTPs from the blockchain. Candidates and voter accounts will be preserved.', async () => {
+        const r = await api.post('/api/admin/reset-votes', {});
+        if (r.ok) {
+          ui.showAlert('resetAlert', 'All votes have been reset.', 'success');
+          ui.toast('Votes cleared', 'warn');
+          loadResults();
+        } else {
+          ui.showAlert('resetAlert', r.errors?.join(' ') || 'Reset failed', 'error');
+        }
+      });
+    });
+
+    document.getElementById('factoryResetBtn').addEventListener('click', () => {
+      showConfirm(
+        '⚠️ Factory Reset — DESTROY EVERYTHING',
+        'This will permanently wipe ALL data: every block, vote, candidate, voter account. This cannot be undone.',
+        async () => {
+          const r = await api.post('/api/admin/factory-reset', {});
+          if (r.ok) {
+            ui.showAlert('resetAlert', 'Factory reset complete. All data destroyed.', 'warn');
+            ui.toast('⚠️ All data wiped', 'warn');
+            candidates = [];
+            renderCandidateList();
+            document.getElementById('resultsContainer').innerHTML = '';
+          } else {
+            ui.showAlert('resetAlert', r.errors?.join(' ') || 'Reset failed', 'error');
+          }
+        }
+      );
+    });
+
+    // ─── Real-time WebSocket Events ───
+    ws.on('vote_cast', (data) => {
+      if (isLoggedIn) loadResults();
+      ui.toast('🗳️ New vote recorded on blockchain', 'info');
+    });
+    ws.on('candidate_added', (data) => {
+      if (data.name && !candidates.includes(data.name)) {
+        candidates.push(data.name);
+        renderCandidateList();
+      }
+    });
+    ws.on('results_updated', (data) => {
+      ui.renderVoteBars('resultsContainer', data.results || {});
+    });
+    ws.on('voting_day_toggled', (data) => {
+      updateVotingDayUI(data.votingDayOn);
+      ui.toast(`🗓️ Voting Day ${data.votingDayOn ? 'OPENED' : 'CLOSED'} by Election Commission`, data.votingDayOn ? 'success' : 'warn');
+    });
+    ws.on('votes_reset', () => {
+      document.getElementById('resultsContainer').innerHTML = '';
+      document.getElementById('resTotalVotes').textContent = '0';
+    });
+    // ─── Voting Day Toggle ───
+    document.getElementById('toggleVotingDayBtn').addEventListener('click', async () => {
+      const btn = document.getElementById('toggleVotingDayBtn');
+      ui.setButtonLoading(btn, true);
+      ui.clearAlert('votingDayAlert');
+      try {
+        const r = await api.post('/api/admin/toggle-voting-day', {});
+        if (r.ok) {
+          updateVotingDayUI(r.votingDayOn);
+          ui.showAlert('votingDayAlert', `Voting Day is now ${r.votingDayOn ? 'OPEN ✅' : 'CLOSED 🔒'} — recorded on blockchain`, r.votingDayOn ? 'success' : 'warn');
+          ui.toast(`🗓️ Voting Day ${r.votingDayOn ? 'OPENED' : 'CLOSED'}`, r.votingDayOn ? 'success' : 'warn');
+        } else {
+          ui.showAlert('votingDayAlert', r.errors?.join(' ') || 'Toggle failed', 'error');
+        }
+      } catch (err) { ui.showAlert('votingDayAlert', 'Server error: ' + err.message, 'error'); }
+      ui.setButtonLoading(btn, false);
+    });
+
+    function updateVotingDayUI(isOn) {
+      const icon  = document.getElementById('votingDayIcon');
+      const label = document.getElementById('votingDayLabel');
+      const btn   = document.getElementById('toggleVotingDayBtnText');
+      icon.textContent  = isOn ? '🗳️' : '🔒';
+      label.textContent = `Voting Day: ${isOn ? 'OPEN' : 'CLOSED'}`;
+      label.style.color = isOn ? 'var(--c-success)' : 'var(--c-danger)';
+      btn.textContent   = isOn ? '🔒 Close Voting Day (Turn OFF)' : '🗓️ Open Voting Day (Turn ON)';
+    }
+
+    // ─── Audit Ledger ───
+    let auditLines = [];
+    document.getElementById('auditLedgerBtn').addEventListener('click', async () => {
+      const btn = document.getElementById('auditLedgerBtn');
+      ui.setButtonLoading(btn, true);
+      const log = document.getElementById('auditLog');
+      log.innerHTML = '<span class="log-info">>>> Loading full audit...</span>';
+      log.classList.remove('hidden');
+      try {
+        const r = await api.get('/api/admin/audit-ledger');
+        auditLines = r.lines || [];
+        log.innerHTML = auditLines.map(l => {
+          if (l.includes('[VOTE CAST]') || l.includes('USER_VOTE'))   return `<div class="log-ok">${l}</div>`;
+          if (l.includes('[TAMPER]') || l.includes('COMPROMISED'))    return `<div class="log-tamper">${l}</div>`;
+          if (l.includes('[REGISTRATION]') || l.includes('[OK]'))     return `<div class="log-ok">${l}</div>`;
+          if (l.includes('[SECURITY]') || l.includes('[PERMISSION]')) return `<div class="log-warn">${l}</div>`;
+          if (l.includes('[CONFIG]') || l.includes('[CANDIDATE]'))    return `<div class="log-info">${l}</div>`;
+          return `<div class="log-info">${l}</div>`;
+        }).join('');
+        document.getElementById('downloadAuditBtn').style.display = 'inline-flex';
+      } catch (err) { log.innerHTML = `<span class="log-tamper">Error: ${err.message}</span>`; }
+      ui.setButtonLoading(btn, false);
+    });
+
+    document.getElementById('downloadAuditBtn').addEventListener('click', () => {
+      const blob = new Blob([auditLines.join('\n')], { type: 'text/plain' });
+      const url  = URL.createObjectURL(blob);
+      const a    = document.createElement('a');
+      a.href     = url;
+      a.download = `audit_${new Date().toISOString().replace(/:/g,'-')}.txt`;
+      a.click();
+      URL.revokeObjectURL(url);
+      ui.toast('Audit report downloaded!', 'success');
+    });
+
+    ws.on('chain_verified', (data) => {
+      const badge = document.getElementById('chainBadge');
+      badge.className = `chain-badge ${data.intact ? 'intact' : 'tampered'}`;
+      badge.textContent = data.intact ? '✅ Blockchain INTACT' : '🚨 TAMPERED!';
+    });
+  </script>
+</body>
+</html>
+

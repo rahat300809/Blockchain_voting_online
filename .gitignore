@@ -1,0 +1,15 @@
+# Ignore node modules
+node_modules/
+api-server/node_modules/
+
+# Ignore local logs and temporary files
+*.log
+1
+7
+asem.txt
+data.txt.bak
+election_data.enc.bak
+
+# Ignore OS files
+.DS_Store
+Thumbs.db

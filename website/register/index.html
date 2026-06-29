@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Voter Registration — BlockVote</title>
+  <meta name="description" content="Register as a voter on the blockchain. Get your unique cryptographic secret key.">
+  <link rel="stylesheet" href="/css/design-system.css">
+  <style>
+    .main-content { padding: 32px 0; max-width: 580px; margin: 0 auto; }
+
+    .reg-steps { margin-bottom: 32px; }
+
+    .success-screen {
+      text-align: center; padding: 40px 32px;
+      animation: scaleIn 0.4s var(--ease-out);
+    }
+    .success-icon { font-size: 4rem; display: block; margin-bottom: 16px; animation: otp-appear 0.5s var(--ease-out); }
+    .success-title { font-size: 1.5rem; font-weight: 800; margin-bottom: 8px; }
+    .success-subtitle { color: var(--c-text-muted); margin-bottom: 32px; font-size: 0.9rem; }
+
+    .key-box {
+      background: rgba(139,92,246,0.06); border: 1px solid rgba(139,92,246,0.25);
+      border-radius: var(--r-xl); padding: 32px; margin-bottom: 24px;
+    }
+    .key-label { font-size: 0.75rem; font-weight: 700; text-transform: uppercase;
+      letter-spacing: 0.1em; color: var(--c-register); margin-bottom: 12px; }
+    .key-value {
+      font-family: var(--font-mono); font-size: 0.72rem; color: #c4b5fd;
+      word-break: break-all; line-height: 2; letter-spacing: 0.05em;
+      background: rgba(0,0,0,0.3); border-radius: var(--r-sm); padding: 12px 16px;
+    }
+
+    .warning-box {
+      background: rgba(245,158,11,0.08); border: 1px solid rgba(245,158,11,0.3);
+      border-radius: var(--r-md); padding: 16px 20px;
+      font-size: 0.82rem; line-height: 1.7; color: #fcd34d;
+    }
+    .warning-box strong { color: var(--c-warn); }
+
+    .copy-btn {
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 8px 16px; border-radius: var(--r-sm);
+      background: rgba(139,92,246,0.15); border: 1px solid rgba(139,92,246,0.3);
+      color: var(--c-register); cursor: pointer; font-size: 0.8rem; font-weight: 600;
+      transition: all var(--t-fast); margin-top: 12px;
+    }
+    .copy-btn:hover { background: rgba(139,92,246,0.25); }
+    .copy-btn.copied { background: rgba(16,185,129,0.15); border-color: rgba(16,185,129,0.3); color: var(--c-success); }
+  </style>
+</head>
+<body>
+  <div class="bg-grid" aria-hidden="true"></div>
+  <div class="bg-glow bg-glow-2" aria-hidden="true"
+    style="background:radial-gradient(circle,#8b5cf6,transparent 70%);bottom:-100px;right:-100px"></div>
+
+  <div class="page-wrapper">
+    <nav class="navbar" role="navigation">
+      <div class="container navbar-inner">
+        <a href="/" class="navbar-brand">
+          <div class="logo-icon" aria-hidden="true">🔗</div>
+          <div class="brand-text">Block<span>Vote</span></div>
+        </a>
+        <div class="navbar-status">
+          <div class="status-dot" id="statusDot"></div>
+          <span class="status-text" id="statusText">Connecting...</span>
+        </div>
+      </div>
+    </nav>
+
+    <div class="container">
+      <div class="main-content">
+
+        <!-- Registration Form -->
+        <div id="regFormSection">
+          <div class="page-header">
+            <div class="page-title">🗳️ Voter Registration</div>
+            <div class="page-desc">Register on the blockchain to receive your unique secret key</div>
+          </div>
+
+          <!-- Steps -->
+          <div class="steps reg-steps" aria-label="Registration progress">
+            <div class="step active" id="step1">
+              <div class="step-num" aria-current="step">1</div>
+              <div class="step-label">Verify Identity</div>
+            </div>
+            <div class="step" id="step2">
+              <div class="step-num">2</div>
+              <div class="step-label">Get Secret Key</div>
+            </div>
+            <div class="step" id="step3">
+              <div class="step-num">3</div>
+              <div class="step-label">Save Credentials</div>
+            </div>
+          </div>
+
+          <div class="card role-register fade-in">
+            <div class="card-header">
+              <div class="card-icon role-register" aria-hidden="true">📋</div>
+              <div>
+                <div class="card-title">Create Voter Account</div>
+                <div class="card-subtitle">Your ID and fingerprint will be verified against the official voter roll</div>
+              </div>
+            </div>
+
+            <div class="alert alert-info mb-lg">
+              <span class="alert-icon" aria-hidden="true">ℹ️</span>
+              <div>
+                <strong>Before registering</strong>, make sure the Election Commission has loaded the voter file and your voter number appears in the official roll.
+              </div>
+            </div>
+
+            <form id="regForm" novalidate>
+              <div class="form-grid" style="gap:20px">
+                <div class="form-group">
+                  <label class="form-label" for="voterNum">Voter Number</label>
+                  <input class="form-input mono" type="text" id="voterNum"
+                    placeholder="e.g. BD001" required aria-required="true"
+                    autocomplete="off">
+                  <div class="form-helper">Your official voter registration number</div>
+                </div>
+                <div class="form-group">
+                  <label class="form-label" for="voterFp">Fingerprint Code</label>
+                  <input class="form-input mono" type="text" id="voterFp"
+                    placeholder="e.g. 1234" required aria-required="true"
+                    autocomplete="off" maxlength="10">
+                  <div class="form-helper">Your registered fingerprint identifier code</div>
+                </div>
+              </div>
+              <div id="regAlert" class="mt-md" aria-live="polite"></div>
+              <button type="submit" class="btn btn-full btn-lg mt-xl" id="regBtn"
+                style="background:linear-gradient(135deg,var(--c-register),#7c3aed);color:#fff;box-shadow:0 4px 16px rgba(139,92,246,0.3)">
+                <span class="btn-text">📋 Register on Blockchain</span>
+              </button>
+            </form>
+
+            <div class="mt-xl text-center">
+              <span class="text-muted" style="font-size:0.82rem">Already registered? </span>
+              <a href="/vote" class="text-primary" style="font-size:0.82rem;font-weight:600">Go to Vote Casting →</a>
+            </div>
+          </div>
+        </div>
+
+        <!-- Success Screen (hidden until registered) -->
+        <div id="successSection" class="hidden">
+          <div class="card role-register fade-in success-screen">
+            <span class="success-icon" aria-hidden="true">🎉</span>
+            <div class="success-title">Registration Successful!</div>
+            <div class="success-subtitle">Your voter account has been created on the blockchain</div>
+
+            <div class="key-box">
+              <div class="key-label">🔑 Your Secret Key</div>
+              <div class="key-value" id="displaySecretKey" aria-label="Your secret key"></div>
+              <button class="copy-btn" id="copyKeyBtn" aria-label="Copy secret key to clipboard">
+                📋 Copy Key
+              </button>
+            </div>
+
+            <div class="warning-box mb-lg">
+              <strong>⚠️ CRITICAL — Read Carefully:</strong><br><br>
+              • This key is <strong>NEVER saved to the blockchain</strong><br>
+              • You need this key + your fingerprint to log in and vote<br>
+              • If you lose this key, you <strong>cannot recover it</strong><br>
+              • <strong>Download or write it down now</strong> before leaving this page
+            </div>
+
+            <div class="d-flex gap-md justify-between flex-wrap">
+              <button class="btn btn-primary" id="downloadBtn">
+                ⬇️ Download Credentials
+              </button>
+              <a href="/vote" class="btn btn-success">
+                🗳️ Go Cast Your Vote →
+              </a>
+            </div>
+
+            <div class="mt-lg text-center">
+              <button class="btn btn-ghost btn-sm" onclick="location.reload()">Register Another Voter</button>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <script src="/js/config.js"></script>
+  <script src="/js/websocket-client.js"></script>
+  <script>
+    const { ws, api, ui } = window.VotingSystem;
+    ws.connect('register');
+
+    let secretKey = '';
+    let voterNum = '';
+
+    function setStep(n) {
+      for (let i = 1; i <= 3; i++) {
+        const s = document.getElementById(`step${i}`);
+        s.classList.remove('active', 'done');
+        if (i < n) s.classList.add('done');
+        else if (i === n) s.classList.add('active');
+      }
+    }
+
+    document.getElementById('regForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const btn = document.getElementById('regBtn');
+      ui.setButtonLoading(btn, true);
+      ui.clearAlert('regAlert');
+
+      voterNum = document.getElementById('voterNum').value.trim();
+      const fp = document.getElementById('voterFp').value.trim();
+
+      if (!voterNum || !fp) {
+        ui.showAlert('regAlert', 'Please enter both voter number and fingerprint', 'error');
+        ui.setButtonLoading(btn, false);
+        return;
+      }
+
+      try {
+        const r = await api.post('/api/voter/register', { voterNumber: voterNum, fingerprint: fp });
+        if (r.ok && r.secretKey) {
+          secretKey = r.secretKey;
+          showSuccess(secretKey);
+          setStep(2);
+        } else {
+          const msg = r.errors?.join(' ') || r.messages?.join(' ') || 'Registration failed. Check voter number and fingerprint.';
+          ui.showAlert('regAlert', msg, 'error');
+        }
+      } catch (err) {
+        ui.showAlert('regAlert', 'Server error: ' + err.message, 'error');
+      }
+      ui.setButtonLoading(btn, false);
+    });
+
+    function showSuccess(key) {
+      document.getElementById('regFormSection').classList.add('hidden');
+      document.getElementById('successSection').classList.remove('hidden');
+      document.getElementById('displaySecretKey').textContent = key;
+      setStep(2);
+    }
+
+    // Copy key
+    document.getElementById('copyKeyBtn').addEventListener('click', async () => {
+      try {
+        await navigator.clipboard.writeText(secretKey);
+        const btn = document.getElementById('copyKeyBtn');
+        btn.classList.add('copied');
+        btn.textContent = '✅ Copied!';
+        setTimeout(() => {
+          btn.classList.remove('copied');
+          btn.textContent = '📋 Copy Key';
+        }, 2500);
+        ui.toast('Secret key copied to clipboard!', 'success');
+      } catch {
+        ui.toast('Copy failed — select and copy manually', 'warn');
+      }
+    });
+
+    // Download credentials
+    document.getElementById('downloadBtn').addEventListener('click', () => {
+      const content = [
+        '======================================',
+        '        VOTER CREDENTIALS              ',
+        '======================================',
+        `Voter Number : ${voterNum}`,
+        `Secret Key   : ${secretKey}`,
+        '--------------------------------------',
+        'WARNING: Do NOT share this file!',
+        'This key is needed to cast your vote.',
+        '======================================',
+        `Generated at : ${new Date().toLocaleString()}`,
+      ].join('\n');
+      const blob = new Blob([content], { type: 'text/plain' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `voter_credentials_${voterNum}.txt`;
+      a.click();
+      URL.revokeObjectURL(url);
+      setStep(3);
+      ui.toast('Credentials downloaded!', 'success');
+    });
+
+    // WebSocket events
+    ws.on('voter_file_loaded', () => {
+      ui.toast('📂 Voter file updated by Election Commission', 'info');
+    });
+  </script>
+</body>
+</html>
+
