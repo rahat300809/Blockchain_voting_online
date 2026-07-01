@@ -1,42 +1,55 @@
-name: 🚀 Deploy Frontend to Firebase Hosting
+name: Deploy Backend to Fly.io
 
 on:
   push:
-    branches:
-      - main
-      - master
+    branches: [main]
     paths:
+      - 'api-server/**'
+      - 'Dockerfile'
+      - 'fly.toml'
       - 'website/**'
-      - 'firebase.json'
-      - '.firebaserc'
-      - '.github/workflows/deploy.yml'
-  workflow_dispatch:   # Allow manual trigger from GitHub UI
 
 jobs:
-  deploy:
-    name: Deploy to Firebase Hosting
+  # ── Deploy Backend to Fly.io ───────────────────────────────────────────────
+  deploy-backend:
+    name: Deploy Backend (Fly.io)
     runs-on: ubuntu-latest
-
     steps:
-      - name: ⬇️ Checkout repository
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: 🟢 Setup Node.js
+      - name: Setup Fly CLI
+        uses: superfly/flyctl-actions/setup-flyctl@master
+
+      - name: Deploy to Fly.io
+        run: flyctl deploy --remote-only --strategy=immediate
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+
+      - name: Set Admin/Agent passwords (optional secrets)
+        run: |
+          flyctl secrets set \
+            ADMIN_PASS="${{ secrets.ADMIN_PASS || 'admin123' }}" \
+            AGENT_PASS="${{ secrets.AGENT_PASS || 'agent123' }}" \
+            ENCRYPT_KEY="${{ secrets.ENCRYPT_KEY || 'BlockVote-AES256-Key-2024' }}" \
+            --app blockchain300809-api 2>/dev/null || true
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+
+  # ── Deploy Frontend to Firebase Hosting ────────────────────────────────────
+  deploy-frontend:
+    name: Deploy Frontend (Firebase)
+    runs-on: ubuntu-latest
+    needs: deploy-backend   # Deploy backend first to get stable URL
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '20'
 
-      - name: 📦 Install Firebase CLI
+      - name: Install Firebase CLI
         run: npm install -g firebase-tools
 
-      - name: 🚀 Deploy to Firebase Hosting
-        run: firebase deploy --only hosting --token "$FIREBASE_TOKEN" --non-interactive
-        env:
-          FIREBASE_TOKEN: ${{ secrets.FIREBASE_TOKEN }}
-
-      - name: ✅ Deployment Summary
-        run: |
-          echo "==========================================="
-          echo "  ✅ Frontend deployed successfully!"
-          echo "  🌐 Live at: https://blockchain300809.web.app"
-          echo "==========================================="
+      - name: Deploy to Firebase Hosting
+        run: firebase deploy --only hosting --token "${{ secrets.FIREBASE_TOKEN }}"

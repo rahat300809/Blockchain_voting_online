@@ -1,17 +1,12 @@
 /**
- * server.js — Main Express + WebSocket Server (v3.0 — P2P Edition)
+ * server.js — Main Express + WebSocket Server (v4.0 — Cloud Edition)
  *
- * Blockchain Voting System v3.0
+ * Blockchain Voting System v4.0
  * - REST API routes for all 4 terminal roles
  * - WebSocket server for real-time broadcast to all connected browsers
- * - Bridges to C++ executables via bridge.js (unchanged C++ logic)
+ * - Pure Node.js blockchain engine (blockchain-core.js) — NO C++ executables!
+ * - Runs on any cloud platform (Fly.io, Render, Railway, etc.)
  * - Firebase sync via firebase-sync.js
- *
- * New in v3.0:
- *   POST /api/admin/toggle-voting-day    — Toggle election open/closed
- *   GET  /api/admin/audit-ledger         — Full blockchain audit log
- *   POST /api/voter/verify-vote          — Voter verifies own vote on chain
- *   GET  /api/voter/candidates           — Candidate list via admin results
  */
 
 const express = require('express');
@@ -23,7 +18,7 @@ const path    = require('path');
 const fs      = require('fs');
 const { v4: uuidv4 } = require('uuid');
 
-const bridge   = require('./bridge');
+const bridge   = require('./blockchain-core');  // Pure JS — no C++ needed!
 const firebase = require('./firebase-sync');
 
 // ──────────────────────────────────────────────────────────────
@@ -84,7 +79,8 @@ wss.on('connection', (ws, req) => {
 // In-Memory Election State Cache
 // ──────────────────────────────────────────────────────────────
 
-const electionState = {
+// Dynamic state from blockchain-core (always up to date)
+let electionState = {
   candidates:      [],
   votes:           {},
   chainIntact:     null,
@@ -96,6 +92,22 @@ const electionState = {
   adminLoggedIn:   false,
   agentLoggedIn:   false,
 };
+
+function syncElectionState() {
+  const s = bridge.getState();
+  electionState.candidates      = s.candidates || [];
+  electionState.votes           = s.votes || {};
+  electionState.chainIntact     = s.chainIntact;
+  electionState.blockCount      = s.blockCount || 0;
+  electionState.voterFileLoaded = (s.voterCount || 0) > 0;
+  electionState.registeredCount = s.registeredCount || 0;
+  electionState.votesCast       = s.votesCast || 0;
+  electionState.votingDayOn     = s.votingDayOn || false;
+}
+
+// Initialize state from saved blockchain data
+syncElectionState();
+
 
 // ──────────────────────────────────────────────────────────────
 // Admin Routes — Election Commission
@@ -123,11 +135,10 @@ app.post('/api/admin/load-voter-file', async (req, res) => {
   try {
     const r = await bridge.adminLoadVoterFile(filePath);
     if (r.ok) {
-      electionState.voterFileLoaded = true;
+      syncElectionState();
       broadcast('voter_file_loaded', { path: filePath, messages: r.messages });
       firebase.syncElectionState({ voterFileLoaded: true, voterFilePath: filePath });
       firebase.logAuditEvent({ type: 'voter_file_loaded', filePath });
-      bridge.killAll(); // Restart sessions to load fresh database state
     }
     res.json(r);
   } catch (err) {
@@ -140,18 +151,17 @@ app.post('/api/admin/save-voter-data', async (req, res) => {
   if (!voterData) return res.status(400).json({ ok: false, errors: ['Missing voter data'] });
   const targetPath = filePath || 'data.txt';
   try {
-    // Write pasted data to file
+    // Write pasted data to file (for backup)
     const absolutePath = path.resolve(path.join(__dirname, '..', targetPath));
     fs.writeFileSync(absolutePath, voterData.trim() + '\n', 'utf8');
 
-    // Load file into blockchain C++ process
-    const r = await bridge.adminLoadVoterFile(targetPath);
+    // Load directly into blockchain-core (pass raw data)
+    const r = await bridge.adminLoadVoterFile(voterData.trim());
     if (r.ok) {
-      electionState.voterFileLoaded = true;
+      syncElectionState();
       broadcast('voter_file_loaded', { path: targetPath, messages: r.messages });
       firebase.syncElectionState({ voterFileLoaded: true, voterFilePath: targetPath });
       firebase.logAuditEvent({ type: 'voter_file_loaded', filePath: targetPath });
-      bridge.killAll(); // Restart sessions to load fresh database state
     }
     res.json(r);
   } catch (err) {
@@ -165,10 +175,7 @@ app.post('/api/admin/add-candidate', async (req, res) => {
   try {
     const r = await bridge.adminAddCandidate(name);
     if (r.ok) {
-      if (!electionState.candidates.includes(name)) {
-        electionState.candidates.push(name);
-        electionState.votes[name] = 0;
-      }
+      syncElectionState();
       broadcast('candidate_added', { name, candidates: electionState.candidates });
       firebase.updateCandidates(electionState.candidates);
       firebase.logAuditEvent({ type: 'candidate_added', name });
