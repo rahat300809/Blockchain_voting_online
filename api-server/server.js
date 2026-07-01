@@ -21,6 +21,8 @@ const { v4: uuidv4 } = require('uuid');
 const bridge   = require('./blockchain-core');  // Pure JS — no C++ needed!
 const firebase = require('./firebase-sync');
 
+const DATA_DIR = process.env.DATA_DIR || path.join(__dirname, '..');
+
 // ──────────────────────────────────────────────────────────────
 // Server Setup
 // ──────────────────────────────────────────────────────────────
@@ -151,8 +153,8 @@ app.post('/api/admin/save-voter-data', async (req, res) => {
   if (!voterData) return res.status(400).json({ ok: false, errors: ['Missing voter data'] });
   const targetPath = filePath || 'data.txt';
   try {
-    // Write pasted data to file (for backup)
-    const absolutePath = path.resolve(path.join(__dirname, '..', targetPath));
+    // Write pasted data to file (for backup) inside writable data directory
+    const absolutePath = path.resolve(path.join(DATA_DIR, targetPath));
     fs.writeFileSync(absolutePath, voterData.trim() + '\n', 'utf8');
 
     // Load directly into blockchain-core (pass raw data)
