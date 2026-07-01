@@ -239,14 +239,9 @@ app.post('/api/admin/factory-reset', async (req, res) => {
   try {
     const r = await bridge.adminFactoryReset();
     if (r.ok) {
-      Object.assign(electionState, {
-        candidates: [], votes: {}, votesCast: 0,
-        voterFileLoaded: false, chainIntact: null,
-        votingDayOn: false, registeredCount: 0,
-      });
+      syncElectionState();
       broadcast('factory_reset', {});
       firebase.logAuditEvent({ type: 'factory_reset' });
-      bridge.killAll(); // Restart sessions to load fresh database state
     }
     res.json(r);
   } catch (err) {
@@ -259,7 +254,7 @@ app.post('/api/admin/toggle-voting-day', async (req, res) => {
   try {
     const r = await bridge.adminToggleVotingDay();
     if (r.ok) {
-      electionState.votingDayOn = r.votingDayOn;
+      syncElectionState();
       broadcast('voting_day_toggled', { votingDayOn: r.votingDayOn });
       firebase.syncElectionState({ votingDayOn: r.votingDayOn });
       firebase.logAuditEvent({ type: 'voting_day_toggle', state: r.votingDayOn ? 'ON' : 'OFF' });
