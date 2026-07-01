@@ -7,6 +7,22 @@
   <meta name="description" content="Ultra-secure blockchain-based voting system with AES-256 encryption, SHA-256 hashing, and real-time WebSocket synchronization.">
   <link rel="stylesheet" href="/css/design-system.css">
   <style>
+    body {
+      background-color: #030712;
+      background-image: radial-gradient(circle at 80% 20%, rgba(3, 7, 18, 0.45) 15%, #030712 85%), url('/img/blockchain-bg.png');
+      background-size: 1100px;
+      background-position: right -150px top -100px;
+      background-repeat: no-repeat;
+      background-attachment: fixed;
+    }
+    @media (max-width: 992px) {
+      body {
+        background-size: 800px;
+        background-position: center top -100px;
+        background-image: radial-gradient(circle at 50% 15%, rgba(3, 7, 18, 0.75) 10%, #030712 80%), url('/img/blockchain-bg.png');
+      }
+    }
+
     /* ─── Landing-specific styles ─── */
     .hero {
       padding: 80px 0 60px;
@@ -263,76 +279,93 @@
             <div class="lc-label">Active Terminals</div>
           </div>
         </section>
-
-        <!-- Terminal Cards -->
-        <section aria-labelledby="terminals-heading">
+        
+        <!-- Terminal Cards (Categorized Portals) -->
+        <section aria-labelledby="terminals-heading" style="margin-bottom: 64px">
           <h2 id="terminals-heading" class="sr-only">Terminal Access Panels</h2>
-          <div class="terminals-grid">
+          
+          <div style="display: flex; flex-direction: column; gap: 40px;">
+            
+            <!-- Category 1: Public Voters Portal -->
+            <div>
+              <h3 style="font-size: 1.25rem; font-weight: 800; color: var(--c-success); margin-bottom: 20px; display: flex; align-items: center; gap: 10px; border-bottom: 1px solid rgba(16,185,129,0.15); padding-bottom: 10px;">
+                <span style="background: rgba(16,185,129,0.15); padding: 6px; border-radius: 8px;">🗳️</span> Public Voters Portal
+              </h3>
+              <div class="terminals-grid">
+                <!-- Voter Registration -->
+                <a href="/register" class="terminal-card tc-register" id="link-register" aria-label="Voter Registration Panel">
+                  <div class="tc-icon" aria-hidden="true">📋</div>
+                  <div>
+                    <div class="tc-title">Voter Registration</div>
+                    <div class="tc-desc">Register as a voter using your voter number and fingerprint. Receive a unique cryptographic secret key stored only by you.</div>
+                  </div>
+                  <div class="tc-steps" aria-label="Registration steps">
+                    <div class="tc-step"><div class="tc-step-dot" aria-hidden="true"></div>Enter voter ID & fingerprint</div>
+                    <div class="tc-step"><div class="tc-step-dot" aria-hidden="true"></div>System validates against voter roll</div>
+                    <div class="tc-step"><div class="tc-step-dot" aria-hidden="true"></div>Receive your unique secret key</div>
+                    <div class="tc-step"><div class="tc-step-dot" aria-hidden="true"></div>Key is NEVER stored in blockchain</div>
+                  </div>
+                  <div class="tc-arrow" aria-hidden="true">→</div>
+                </a>
 
-            <!-- Admin / Election Commission -->
-            <a href="/admin" class="terminal-card tc-admin" id="link-admin" aria-label="Election Commission Panel">
-              <div class="tc-icon" aria-hidden="true">🏛️</div>
-              <div>
-                <div class="tc-title">Election Commission</div>
-                <div class="tc-desc">Manage the entire election: load voter rolls, add candidates, view live results, and verify blockchain integrity.</div>
+                <!-- Vote Casting -->
+                <a href="/vote" class="terminal-card tc-voter" id="link-voter" aria-label="Vote Casting Panel">
+                  <div class="tc-icon" aria-hidden="true">🗳️</div>
+                  <div>
+                    <div class="tc-title">Cast Your Vote</div>
+                    <div class="tc-desc">Log in with your secret key and fingerprint, enter your OTP from the polling agent, then cast your anonymous vote on the blockchain.</div>
+                  </div>
+                  <div class="tc-steps" aria-label="Voting steps">
+                    <div class="tc-step"><div class="tc-step-dot" aria-hidden="true"></div>Login with secret key + fingerprint</div>
+                    <div class="tc-step"><div class="tc-step-dot" aria-hidden="true"></div>Enter OTP from polling agent</div>
+                    <div class="tc-step"><div class="tc-step-dot" aria-hidden="true"></div>Select your candidate</div>
+                    <div class="tc-step"><div class="tc-step-dot" aria-hidden="true"></div>Vote recorded anonymously on-chain</div>
+                  </div>
+                  <div class="tc-arrow" aria-hidden="true">→</div>
+                </a>
               </div>
-              <div class="tc-steps" aria-label="Admin responsibilities">
-                <div class="tc-step"><div class="tc-step-dot" aria-hidden="true"></div>Load voter file & authorize voters</div>
-                <div class="tc-step"><div class="tc-step-dot" aria-hidden="true"></div>Add election candidates</div>
-                <div class="tc-step"><div class="tc-step-dot" aria-hidden="true"></div>Monitor live results dashboard</div>
-                <div class="tc-step"><div class="tc-step-dot" aria-hidden="true"></div>Verify blockchain integrity</div>
-              </div>
-              <div class="tc-arrow" aria-hidden="true">→</div>
-            </a>
+            </div>
 
-            <!-- Polling Agent -->
-            <a href="/agent" class="terminal-card tc-agent" id="link-agent" aria-label="Polling Agent Panel">
-              <div class="tc-icon" aria-hidden="true">🧑‍💼</div>
-              <div>
-                <div class="tc-title">Polling Agent</div>
-                <div class="tc-desc">Verify voter fingerprints and issue one-time 6-digit OTPs that expire in 5 minutes for secure vote casting.</div>
-              </div>
-              <div class="tc-steps" aria-label="Agent responsibilities">
-                <div class="tc-step"><div class="tc-step-dot" aria-hidden="true"></div>Verify voter identity & fingerprint</div>
-                <div class="tc-step"><div class="tc-step-dot" aria-hidden="true"></div>Issue time-limited 6-digit OTP</div>
-                <div class="tc-step"><div class="tc-step-dot" aria-hidden="true"></div>OTP auto-expires in 5 minutes</div>
-                <div class="tc-step"><div class="tc-step-dot" aria-hidden="true"></div>One OTP per voter per session</div>
-              </div>
-              <div class="tc-arrow" aria-hidden="true">→</div>
-            </a>
+            <!-- Category 2: Officials Portal -->
+            <div>
+              <h3 style="font-size: 1.25rem; font-weight: 800; color: var(--c-primary); margin-bottom: 20px; display: flex; align-items: center; gap: 10px; border-bottom: 1px solid rgba(59,130,246,0.15); padding-bottom: 10px;">
+                <span style="background: rgba(59,130,246,0.15); padding: 6px; border-radius: 8px;">🏛️</span> Officials Portal (Authorized Staff Only)
+              </h3>
+              <div class="terminals-grid">
+                <!-- Admin / Election Commission -->
+                <a href="/admin" class="terminal-card tc-admin" id="link-admin" aria-label="Election Commission Panel">
+                  <div class="tc-icon" aria-hidden="true">🏛️</div>
+                  <div>
+                    <div class="tc-title">Election Commission</div>
+                    <div class="tc-desc">Manage the entire election: load voter rolls, add candidates, view live results, and verify blockchain integrity.</div>
+                  </div>
+                  <div class="tc-steps" aria-label="Admin responsibilities">
+                    <div class="tc-step"><div class="tc-step-dot" aria-hidden="true"></div>Load voter file & authorize voters</div>
+                    <div class="tc-step"><div class="tc-step-dot" aria-hidden="true"></div>Add election candidates</div>
+                    <div class="tc-step"><div class="tc-step-dot" aria-hidden="true"></div>Monitor live results dashboard</div>
+                    <div class="tc-step"><div class="tc-step-dot" aria-hidden="true"></div>Verify blockchain integrity</div>
+                  </div>
+                  <div class="tc-arrow" aria-hidden="true">→</div>
+                </a>
 
-            <!-- Voter Registration -->
-            <a href="/register" class="terminal-card tc-register" id="link-register" aria-label="Voter Registration Panel">
-              <div class="tc-icon" aria-hidden="true">📋</div>
-              <div>
-                <div class="tc-title">Voter Registration</div>
-                <div class="tc-desc">Register as a voter using your voter number and fingerprint. Receive a unique cryptographic secret key stored only by you.</div>
+                <!-- Polling Agent -->
+                <a href="/agent" class="terminal-card tc-agent" id="link-agent" aria-label="Polling Agent Panel">
+                  <div class="tc-icon" aria-hidden="true">🧑‍💼</div>
+                  <div>
+                    <div class="tc-title">Polling Agent</div>
+                    <div class="tc-desc">Verify voter fingerprints and issue one-time 6-digit OTPs that expire in 5 minutes for secure vote casting.</div>
+                  </div>
+                  <div class="tc-steps" aria-label="Agent responsibilities">
+                    <div class="tc-step"><div class="tc-step-dot" aria-hidden="true"></div>Verify voter identity & fingerprint</div>
+                    <div class="tc-step"><div class="tc-step-dot" aria-hidden="true"></div>Issue time-limited 6-digit OTP</div>
+                    <div class="tc-step"><div class="tc-step-dot" aria-hidden="true"></div>OTP auto-expires in 5 minutes</div>
+                    <div class="tc-step"><div class="tc-step-dot" aria-hidden="true"></div>One OTP per voter per session</div>
+                  </div>
+                  <div class="tc-arrow" aria-hidden="true">→</div>
+                </a>
               </div>
-              <div class="tc-steps" aria-label="Registration steps">
-                <div class="tc-step"><div class="tc-step-dot" aria-hidden="true"></div>Enter voter ID & fingerprint</div>
-                <div class="tc-step"><div class="tc-step-dot" aria-hidden="true"></div>System validates against voter roll</div>
-                <div class="tc-step"><div class="tc-step-dot" aria-hidden="true"></div>Receive your unique secret key</div>
-                <div class="tc-step"><div class="tc-step-dot" aria-hidden="true"></div>Key is NEVER stored in blockchain</div>
-              </div>
-              <div class="tc-arrow" aria-hidden="true">→</div>
-            </a>
-
-            <!-- Vote Casting -->
-            <a href="/vote" class="terminal-card tc-voter" id="link-voter" aria-label="Vote Casting Panel">
-              <div class="tc-icon" aria-hidden="true">🗳️</div>
-              <div>
-                <div class="tc-title">Cast Your Vote</div>
-                <div class="tc-desc">Log in with your secret key and fingerprint, enter your OTP from the polling agent, then cast your anonymous vote on the blockchain.</div>
-              </div>
-              <div class="tc-steps" aria-label="Voting steps">
-                <div class="tc-step"><div class="tc-step-dot" aria-hidden="true"></div>Login with secret key + fingerprint</div>
-                <div class="tc-step"><div class="tc-step-dot" aria-hidden="true"></div>Enter OTP from polling agent</div>
-                <div class="tc-step"><div class="tc-step-dot" aria-hidden="true"></div>Select your candidate</div>
-                <div class="tc-step"><div class="tc-step-dot" aria-hidden="true"></div>Vote recorded anonymously on-chain</div>
-              </div>
-              <div class="tc-arrow" aria-hidden="true">→</div>
-            </a>
-
+            </div>
+            
           </div>
         </section>
 
