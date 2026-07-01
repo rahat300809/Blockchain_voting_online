@@ -11,7 +11,7 @@
   'use strict';
 
   // ── Permanent Backend URL (Fly.io — always online, never changes) ──────────
-  const FLY_URL    = 'https://blockchain300809-api.fly.dev';
+  const FLY_URL    = 'https://blockchain300809-api-rahat.fly.dev';
 
   // ── Development override (localhost when running locally) ──────────────────
   const isLocalhost = window.location.hostname === 'localhost'

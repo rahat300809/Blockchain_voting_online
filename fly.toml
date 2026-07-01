@@ -1,7 +1,7 @@
 # fly.toml — Fly.io Deployment Configuration for BlockVote Backend
 # App URL: https://blockchain300809-api.fly.dev
 
-app            = "blockchain300809-api"
+app            = "blockchain300809-api-rahat"
 primary_region = "sin"   # Singapore — closest to Bangladesh
 
 [build]

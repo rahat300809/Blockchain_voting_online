@@ -230,6 +230,7 @@ int main()
         outfile.write((char*)&s, sizeof(s));
         outfile.write((char*)blk.data(), s);
     }
+    
     outfile.flush();
     outfile.close();
 
@@ -239,6 +240,5 @@ int main()
     cout<<"        'Verify Blockchain Integrity'"<<endl;
     cout<<"        It will detect the tamper!"<<endl;
     cout<<"======================================"<<endl;
-
     return 0;
 }

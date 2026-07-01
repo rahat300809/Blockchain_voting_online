@@ -428,19 +428,26 @@ body {
 
 /* ─── Connection Banner ─── */
 .connection-banner {
-  position: fixed; top: 0; left: 0; right: 0; z-index: 999;
-  padding: 10px var(--sp-lg); text-align: center;
-  font-size: 0.8rem; font-weight: 600;
+  position: fixed; bottom: 20px; right: 20px; z-index: 9999;
+  padding: 8px 16px; border-radius: 30px;
+  font-size: 0.78rem; font-weight: 600;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4), 0 0 10px rgba(59, 130, 246, 0.1);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
   transition: all var(--t-med);
+  display: inline-flex; align-items: center; gap: 8px;
 }
 .connection-banner.connected {
-  background: rgba(16,185,129,0.9); color: #fff;
-  animation: banner-hide 3s 1s forwards;
+  background: rgba(16, 185, 129, 0.15); color: #34d399;
+  border-color: rgba(16, 185, 129, 0.35);
+  animation: banner-hide 3s 1.5s forwards;
 }
 .connection-banner.disconnected {
-  background: rgba(239,68,68,0.9); color: #fff;
+  background: rgba(239, 68, 68, 0.15); color: #f87171;
+  border-color: rgba(239, 68, 68, 0.35);
 }
-@keyframes banner-hide { to { opacity: 0; pointer-events: none; transform: translateY(-100%); } }
+@keyframes banner-hide { to { opacity: 0; pointer-events: none; transform: translateY(15px); } }
+
 
 /* ─── Login Screen ─── */
 .login-screen {

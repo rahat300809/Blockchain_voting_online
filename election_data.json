@@ -1,0 +1,67 @@
+{
+  "votingDayOn": true,
+  "candidates": [
+    "Alice"
+  ],
+  "voterList": {
+    "V001": "FP001",
+    "V002": "FP002"
+  },
+  "voters": {
+    "V001": {
+      "fingerprint": "FP001",
+      "secretKey": "7AC7C4E672065B0A3B1B579D",
+      "voted": false,
+      "otpCode": null,
+      "otpExpiry": null
+    }
+  },
+  "blockchain": [
+    {
+      "index": 0,
+      "timestamp": 1782926013493,
+      "type": "CANDIDATE",
+      "data": {
+        "name": "Alice"
+      },
+      "prevHash": "0000000000000000000000000000000000000000000000000000000000000000",
+      "hash": "000a3489869fcbd37ee10bd37a4ab0ea6abdc182295500e4a37a5dad2ca5bf3f",
+      "nonce": 6612
+    },
+    {
+      "index": 1,
+      "timestamp": 1782926013521,
+      "type": "CONFIG",
+      "data": {
+        "action": "voter_file_loaded",
+        "count": 2
+      },
+      "prevHash": "000a3489869fcbd37ee10bd37a4ab0ea6abdc182295500e4a37a5dad2ca5bf3f",
+      "hash": "000305f1bc2f5c2e37bef5b5728dc0673c3a80821a1661db9239887c33f187fa",
+      "nonce": 3325
+    },
+    {
+      "index": 2,
+      "timestamp": 1782926013542,
+      "type": "REGISTRATION",
+      "data": {
+        "voterHash": "f8c9a9ec0afd5aef28075ca7a14747f915a002dfad4e0989b4408c15ed535f99"
+      },
+      "prevHash": "000305f1bc2f5c2e37bef5b5728dc0673c3a80821a1661db9239887c33f187fa",
+      "hash": "0007ebed58daf50c8c4fe8d38d729356a54e5fa23ceb5337bfaf0e5bad8dd7a4",
+      "nonce": 7396
+    },
+    {
+      "index": 3,
+      "timestamp": 1782933854309,
+      "type": "CONFIG",
+      "data": {
+        "action": "voting_day_toggle",
+        "votingDayOn": true
+      },
+      "prevHash": "0007ebed58daf50c8c4fe8d38d729356a54e5fa23ceb5337bfaf0e5bad8dd7a4",
+      "hash": "000b6f296c8e4299e6bb25fc8fe71dd84d3f5df5c9f4656c71488aff422ecc18",
+      "nonce": 6264
+    }
+  ]
+}

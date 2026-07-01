@@ -1682,6 +1682,11 @@ void polling_agent_panel(Blockchain& bc)
 void user_registration(Blockchain& bc)
 {
     bc.load_blockchain();
+    if(bc.is_voting_day_on())
+    {
+        cout<<">>> [DENIED] Registration is closed on Voting Day!"<<endl;
+        return;
+    }
     cout<<"\n--- Voter Registration ---"<<endl;
     string voterNum;
     string fingerprint;
